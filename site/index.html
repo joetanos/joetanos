@@ -195,7 +195,6 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .pnav .btn{flex:1;max-width:50%;display:flex;flex-direction:column;gap:4px;padding:8px 0;border:0;background:transparent;font-size:8px}
 .pnav .btn:last-child{text-align:right}
 .pnav .btn span{font-family:var(--serif,inherit);font-size:15px;letter-spacing:0;text-transform:none;color:var(--muted)}
-@media(max-width:600px){.pnav{flex-direction:column}.pnav .btn{max-width:none}.pnav .btn:last-child{text-align:left}}
 .hint{font-size:13px;color:var(--muted);min-height:22px}
 dl.specs{border-top:1px solid var(--line);margin-top:24px}
 dl.specs div{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;gap:16px}
@@ -687,8 +686,8 @@ function product(slug){
     </div>
   </div>
   <nav class="pnav" aria-label="More prints">
-    <a class="btn ghost" href="#/print/${prev.slug}" rel="prev">&larr; View previous print</a>
-    <a class="btn ghost" href="#/print/${next.slug}" rel="next">View next print &rarr;</a>
+    <a class="btn ghost" href="#/print/${prev.slug}" rel="prev">&larr; View previous</a>
+    <a class="btn ghost" href="#/print/${next.slug}" rel="next">View next &rarr;</a>
   </nav>
   ${related.length?`<section class="block"><div class="rule sec-head"><h2>Related work</h2></div><div class="grid4">${related.map(card).join("")}</div></section>`:""}
   </div>`;
