@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+wrangler.jsonc
+.assetsignore
+README.md
+.nojekyll
+bun.lock
+bun.lockb
+package-lock.json

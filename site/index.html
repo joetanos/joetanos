@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Joe Tanos — Photographs taken on location, printed in small editions.</title>
+<link rel="icon" href="images/favicon.png">
+<meta property="og:title" content="Joe Tanos — Photographs taken on location">
+<meta property="og:description" content="Limited-edition photographic prints of real places.">
+<meta property="og:image" content="images/bekaa-1.jpg">
+<meta name="description" content="Limited-edition photographic prints of real places. Photographed on location and printed on archival cotton paper.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Herr+Von+Muellerhoff&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F2ED; --bg-alt:#EFEBE4; --ink:#1C1B18; --muted:#807A70; --line:#DDD7CD;
+  --dark:#1F1E1B; --dark-ink:#EDE9E2; --dark-muted:#A39D92; --card:#FFFFFF; --btn:#1C1B18; --btn-ink:#F5F2ED;
+  --sans:"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --serif:"EB Garamond","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --script:"Herr Von Muellerhoff","Snell Roundhand","Brush Script MT",cursive;
+  --wrap:920px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16150F; --bg-alt:#1C1B17; --ink:#ECE8E0; --muted:#9C968B; --line:#34322C;
+    --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F;
+  }
+}
+.logo img{filter:invert(1) brightness(.45)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo img{filter:none}}
+:root[data-theme="dark"] .logo img{filter:none}
+:root[data-theme="dark"]{
+  --bg:#16150F; --bg-alt:#1C1B17; --ink:#ECE8E0; --muted:#9C968B; --line:#34322C;
+  --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 24px}
+.skip{position:absolute;left:-999px}.skip:focus{left:16px;top:16px;background:var(--bg);padding:8px 12px;z-index:100}
+
+/* Header */
+header.site{height:84px;display:flex;align-items:center;position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:1px solid transparent}
+header.site.scrolled{border-bottom-color:var(--line)}
+header.site .wrap{display:flex;align-items:center;justify-content:space-between;width:100%}
+.logo{font-family:var(--script);font-size:40px;line-height:1;letter-spacing:.01em;display:flex;align-items:center;height:40px}
+.logo img{height:60px;width:auto}
+footer .logo img{height:60px}
+.logo{height:auto}
+nav.main{display:flex;gap:26px}
+nav.main a,.cart-link,.small-link{font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:1}
+.cart-link{display:flex;align-items:center;gap:6px;opacity:.8}
+.cart-link svg{width:13px;height:13px}
+.menu-btn{display:none;font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+
+/* Media placeholder / images */
+.ph{position:relative;overflow:hidden;background:#2a2926}
+.ph img{width:100%;height:100%;object-fit:cover}
+
+/* Hero */
+.hero{display:grid;grid-template-columns:67fr 33fr;align-items:center;gap:40px;margin-bottom:70px}
+.hero .ph{aspect-ratio:1254/832}
+.hero .copy{padding-right:40px;max-width:420px}
+.hero-stage{position:relative}
+.hero-slide{position:absolute;inset:0;opacity:0;transition:opacity .9s ease;pointer-events:none}
+.hero-slide.on{opacity:1;pointer-events:auto}
+.hero-slide img.fill{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(28px) brightness(.55);transform:scale(1.15)}
+.pair-wrap{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;gap:12px}
+.pair-wrap img{display:block;height:100%;min-width:0;object-fit:contain}
+.pair-wrap img.main{width:100%}
+.pair-wrap img.second{display:none}
+.hero-slide.pair .pair-wrap img{width:auto;max-width:calc(50% - 6px)}
+.hero-slide.pair .pair-wrap img.second{display:block}
+.hero-stage{overflow:hidden;background:#1a1916}
+.hero-dots{position:absolute;left:20px;bottom:18px;display:flex;gap:8px;z-index:2}
+.hero-dots button{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.45);padding:0;transition:background .3s,transform .3s}
+.hero-dots button[aria-current="true"]{background:#fff;transform:scale(1.25)}
+#heroCap{transition:opacity .4s}
+.caption{font-style:italic;font-size:12px;color:var(--muted);margin-bottom:26px}
+h1,h2,h3{font-family:var(--sans);font-weight:500;letter-spacing:-.02em;line-height:1.08}
+.hero h1{font-size:clamp(34px,3.6vw,52px);margin-bottom:26px}
+.lede{color:var(--muted);font-size:15.5px;line-height:1.6;margin-bottom:30px}
+.btn{display:inline-block;background:var(--btn);color:var(--btn-ink);font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:13px 20px}
+.btn:hover{opacity:.88}
+.btn.full{width:100%;text-align:center;padding:16px}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+
+/* Sections */
+section.block{padding:0 0 80px}
+.rule{border-top:1px solid var(--line);padding-top:22px}
+.sec-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px}
+.sec-head h2{font-size:15px;font-weight:500;letter-spacing:0}
+.sec-head p{font-size:13px;font-style:italic;color:var(--muted)}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:26px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+
+/* Print card */
+.pcard{display:block}
+.pcard .ph{aspect-ratio:1/0.92;margin-bottom:12px}
+.pcard .ph img{transition:opacity .35s}
+.pcard .ph .alt{position:absolute;inset:0;opacity:0}
+.pcard:hover .ph .alt{opacity:1}
+.pcard h3{font-size:12.5px;font-weight:500;letter-spacing:0;line-height:1.35;margin-bottom:4px}
+.pcard .where{font-style:italic;font-size:11.5px;color:var(--muted);margin-bottom:6px}
+.pcard .price{font-family:var(--sans);font-size:11px}
+.more{display:flex;justify-content:flex-end;margin-top:34px}
+.small-link{display:inline-flex;gap:10px;align-items:center;opacity:.75}.small-link:hover{opacity:1}
+
+/* Collections */
+.band{background:var(--bg-alt);padding:80px 0 70px;margin-bottom:80px}
+.cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start}
+.ccard{position:relative;display:block;color:#fff}
+.ccard .ph{aspect-ratio:4/3}
+.ccard.tall .ph{aspect-ratio:3/4}
+.ccard .ov{position:absolute;inset:auto 0 0 0;padding:18px 18px 16px;background:linear-gradient(transparent,rgba(0,0,0,.6))}
+.ccard h3{font-size:12.5px;font-weight:600;letter-spacing:0;margin-bottom:3px}
+.ccard p{font-size:11.5px;opacity:.85;line-height:1.35}
+
+/* About */
+.about{display:grid;grid-template-columns:1fr 0.78fr;gap:50px;align-items:start;padding-bottom:80px}
+.about h2{font-size:clamp(28px,3vw,38px);margin-bottom:28px}
+.about p{color:var(--muted);font-size:15.5px;line-height:1.85;margin-bottom:22px;max-width:520px}
+.about .ph{aspect-ratio:3/4}
+
+/* Process */
+.process{background:var(--dark);color:var(--dark-ink);padding:80px 0 70px}
+.process h2{font-size:24px;margin-bottom:50px}
+.process h3{font-size:12px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;padding-top:14px;position:relative}
+.process h3::before{content:"";position:absolute;top:0;left:0;width:26px;border-top:1px solid var(--dark-muted)}
+.process p{color:var(--dark-muted);font-size:14px;line-height:1.75;max-width:280px}
+
+/* Footer */
+footer.site{padding:44px 0 0}
+footer .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;padding-bottom:30px}
+footer h4{font-family:var(--sans);font-weight:400;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+footer p,footer li{font-size:13.5px;color:var(--muted);line-height:1.8}
+footer ul{list-style:none}
+footer a:hover{color:var(--ink)}
+.legal{border-top:1px solid var(--line);padding:14px 0;display:flex;justify-content:space-between;font-family:var(--sans);font-size:10.5px;color:var(--muted);gap:16px;flex-wrap:wrap}
+
+/* Page heads */
+.phead{padding:60px 0 40px}
+.phead h1{font-size:clamp(30px,3.4vw,44px);margin-bottom:12px}
+.phead p{color:var(--muted);max-width:560px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:34px}
+.chip{font-family:var(--sans);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 13px;border:1px solid var(--line)}
+.chip[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
+
+/* Product */
+.product{display:grid;grid-template-columns:1.25fr 1fr;gap:56px;padding:40px 0 90px;align-items:start}
+.gallery .stage{position:relative;aspect-ratio:4/5;background:var(--bg-alt)}
+.gallery .stage .ph img{object-fit:contain}
+.gallery .stage .ph{background:var(--bg-alt)}
+.gallery .stage .ph{position:absolute;inset:0}
+.gnav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;background:none;color:#fff;display:grid;place-items:center;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));opacity:.85}
+.gnav:hover{opacity:1}
+.gnav svg{width:22px;height:40px}
+.gnav.prev{left:12px}.gnav.next{right:12px}
+.count{position:absolute;right:12px;bottom:12px;background:rgba(28,27,24,.7);color:#fff;font-family:var(--sans);font-size:11px;padding:4px 9px;letter-spacing:.06em}
+.thumbs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+.thumbs button{aspect-ratio:1;opacity:.55;border:1px solid transparent;padding:0}
+.thumbs button[aria-current="true"]{opacity:1;border-color:var(--ink)}
+.thumbs .ph{width:100%;height:100%}
+.pinfo{position:sticky;top:100px}
+.pinfo h1{font-size:clamp(24px,2.4vw,32px);margin-bottom:10px}
+.pinfo .where{font-style:italic;color:var(--muted);font-size:14px;margin-bottom:18px}
+.pinfo .amount{font-family:var(--sans);font-size:20px;margin-bottom:18px}
+.pinfo .desc{color:var(--muted);font-size:15.5px;margin-bottom:28px}
+fieldset{border:0;margin-bottom:22px}
+legend{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;display:flex;gap:8px}
+legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:var(--muted)}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts label{position:relative}
+.opts input{position:absolute;opacity:0}
+.opts span{display:block;border:1px solid var(--line);padding:9px 14px;font-family:var(--sans);font-size:12.5px;cursor:pointer}
+.opts input:checked+span{border-color:var(--ink);background:var(--ink);color:var(--bg)}
+.opts input:focus-visible+span{outline:2px solid var(--ink);outline-offset:2px}
+.buyrow{display:flex;gap:10px;margin-bottom:10px}
+.qty{display:flex;border:1px solid var(--line);align-items:center}
+.qty button{width:38px;height:46px;font-family:var(--sans)}
+.qty output{min-width:28px;text-align:center;font-family:var(--sans);font-size:14px}
+.buyrow .btn{flex:1;padding:15px}
+.btn.wa{display:flex;align-items:center;justify-content:center;gap:10px}
+.btn.wa svg{width:17px;height:17px;flex-shrink:0}
+.hint{font-size:13px;color:var(--muted);min-height:22px}
+dl.specs{border-top:1px solid var(--line);margin-top:24px}
+dl.specs div{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;gap:16px}
+dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+
+/* Cart */
+.cart-row{display:grid;grid-template-columns:90px 1fr auto;gap:20px;padding:20px 0;border-bottom:1px solid var(--line);align-items:center}
+.cart-row .ph{aspect-ratio:1}
+.cart-row h3{font-size:14px;letter-spacing:0;margin-bottom:4px}
+.cart-row .meta{font-size:13.5px;color:var(--muted)}
+.cart-row .right{text-align:right;font-family:var(--sans);font-size:14px}
+.cart-row .right button{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.cart-foot{display:flex;justify-content:space-between;align-items:center;padding:26px 0 90px;gap:20px;flex-wrap:wrap}
+.cart-foot .total{font-family:var(--sans);font-size:18px}
+.empty{padding:20px 0 100px;color:var(--muted)}
+.empty .btn{margin-top:20px}
+
+/* Forms */
+.form{display:grid;gap:16px;max-width:560px;padding-bottom:90px}
+.form label{display:grid;gap:6px;font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.form input,.form textarea,.form select{font:inherit;font-family:var(--serif);font-size:16px;text-transform:none;letter-spacing:0;padding:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.form textarea{min-height:150px;resize:vertical}
+.prose{max-width:620px;padding-bottom:40px}
+.prose p{color:var(--muted);margin-bottom:20px;font-size:16.5px;line-height:1.85}
+.prose h2{font-size:22px;margin:40px 0 14px}
+
+/* Cookie */
+.cookie{position:fixed;left:0;right:0;bottom:0;background:var(--card);box-shadow:0 -6px 30px rgba(0,0,0,.08);z-index:50;padding:16px 0}
+.cookie .wrap{max-width:1040px;display:flex;gap:30px;align-items:center}
+.cookie h2{font-size:12px;font-weight:600;letter-spacing:0;margin-bottom:4px}
+.cookie p{font-size:12.5px;color:var(--muted);line-height:1.5}
+.cookie .acts{display:flex;gap:8px;flex-shrink:0}
+.cookie .acts button{font-size:13px;padding:7px 12px;background:var(--bg-alt)}
+.cookie .acts button.yes{background:var(--btn);color:var(--btn-ink)}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--btn);color:var(--btn-ink);padding:12px 18px;font-family:var(--sans);font-size:12.5px;transition:.3s;z-index:60;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%)}
+
+/* Responsive */
+@media (max-width:900px){
+  .hero{grid-template-columns:1fr;gap:30px}
+  .hero .copy{padding:0 24px}
+  .grid4{grid-template-columns:repeat(2,1fr)}
+  .product,.about{grid-template-columns:1fr}
+  .pinfo{position:static}
+}
+@media (max-width:680px){
+  nav.main{display:none;position:absolute;top:84px;left:0;right:0;background:var(--bg);flex-direction:column;padding:16px 24px 24px;gap:16px;z-index:20;border-bottom:1px solid var(--line)}
+  nav.main.open{display:flex}
+  .menu-btn{display:block}
+  header.site .wrap{gap:14px}
+  .cgrid,.grid3,footer .cols{grid-template-columns:1fr}
+  .ccard.tall .ph{aspect-ratio:4/3}
+  .cookie .wrap{flex-direction:column;align-items:flex-start;gap:12px}
+  .cart-row{grid-template-columns:70px 1fr}
+  .cart-row .right{grid-column:2;text-align:left}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site">
+  <div class="wrap">
+    <a href="#/" class="logo" aria-label="Joe Tanos, home" id="logo"></a>
+    <button class="menu-btn" aria-expanded="false" aria-controls="nav">Menu</button>
+    <nav class="main" id="nav" aria-label="Main">
+      <a href="#/shop">Prints</a>
+      <a href="#/collections">Collections</a>
+      <a href="#/about">About</a>
+      <a href="#/contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a href="#/" class="logo" aria-label="Joe Tanos, home" id="logo2" style="margin-bottom:14px"></a>
+        <p style="max-width:260px;margin-bottom:22px">Limited-edition photographic prints, made and shipped from Beirut.</p>
+        <h4>Reach the studio</h4>
+        <ul><li><a href="mailto:hello@example.com">hello@example.com</a></li><li><a href="#" data-wa>WhatsApp</a></li></ul>
+      </div>
+      <div><h4>Shop</h4><ul><li><a href="#/shop">All prints</a></li><li><a href="#/collections">Collections</a></li></ul></div>
+      <div><h4>Studio</h4><ul><li><a href="#/about">About</a></li><li><a href="#/contact">Contact</a></li></ul></div>
+    </div>
+    <div class="legal"><span>© 2026 Joe Tanos</span><span>All photographs © Joe Tanos. Reproduction without permission is not permitted.</span></div>
+  </div>
+</footer>
+
+<div class="cookie" id="cookie" hidden>
+  <div class="wrap">
+    <div>
+      <h2>Cookie Consent</h2>
+      <p>We serve cookies. We use tools, such as cookies, to enable essential services and functionality on our site and to collect data on how visitors interact with our site, products and services. By clicking Accept, you agree to our use of these tools for advertising, analytics and support.</p>
+    </div>
+    <div class="acts"><button data-c="decline">Decline</button><button class="yes" data-c="accept">Accept</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   YOUR IMAGES
+   Put a real image into any slot below (a data: URI once embedded).
+   Anything left as null shows a drawn placeholder instead.
+   ============================================================ */
+const IMAGES = {
+  "logo": "images/logo.png",
+  hero: null,
+  about: null,
+  "col-new": null, "col-architecture": null, "col-urban": null,
+  "col-landscape": null, "col-details": null, "col-monochrome": null,
+  "louvre-1": "images/louvre-1.jpg",
+  "louvre-2": "images/louvre-2.jpg",
+  "sannine-1": "images/sannine-1.jpg",
+  "sannine-2": "images/sannine-2.jpg",
+  "falougha-1": "images/falougha-1.jpg",
+  "falougha-2": "images/falougha-2.jpg",
+  "falougha-3": "images/falougha-3.jpg",
+  "falougha-4": "images/falougha-4.jpg",
+  "falougha-5": "images/falougha-5.jpg",
+  "bekaa-1": "images/bekaa-1.jpg",
+  "bekaa-2": "images/bekaa-2.jpg",
+  "red-wine-1": "images/red-wine-1.jpg",
+  "red-wine-2": "images/red-wine-2.jpg",
+  "candles-1": "images/candles-1.jpg",
+  "candles-2": "images/candles-2.jpg",
+  "pines-1": "images/pines-1.jpg",
+  "pines-2": "images/pines-2.jpg",
+  "eiffel-1": "images/eiffel-1.jpg",
+  "eiffel-2": "images/eiffel-2.jpg",
+  // Print photos use keys like "louvre-1", "louvre-2", "louvre-3" (see PRINTS below)
+};
+
+/* ============================================================
+   CLOUD CATALOG
+   Paste the "Publish to web" CSV link of your Google Sheet here
+   (or a link to a .json file). The site then reads every print,
+   its text and its image links from the sheet each time it loads,
+   so new prints and photos appear without re-uploading the website.
+   Leave it empty ("") to use the prints written further down instead.
+   ============================================================ */
+const CATALOG_URL = "";
+
+/* ---------- WhatsApp ----------
+   Your number in international format, digits only (no +, spaces or leading 00).
+   Example for Lebanon: 961 + number without the leading 0 → "96171123456" */
+const WHATSAPP_NUMBER = "96181874716";
+function waLink(text){return "https://wa.me/"+WHATSAPP_NUMBER+(text?"?text="+encodeURIComponent(text):"")}
+
+/* ---------- Pricing ---------- */
+const SIZES = [
+  {id:"30x40", label:"30 × 40 cm", price:60},
+  {id:"50x70", label:"50 × 70 cm", price:120},
+  {id:"70x100", label:"70 × 100 cm", price:220}
+];
+const FINISHES = [
+  {id:"print", label:"Canvas Print Only", price:0},
+  {id:"black", label:"Black frame", price:90},
+  {id:"oak", label:"Gallery Wrapped Canvas", price:110}
+];
+
+/* ---------- Collections ---------- */
+const COLLECTIONS = [
+  {slug:"new", name:"New releases", blurb:"The most recent work, added as it is printed.", scene:"pyramid", tall:false},
+  {slug:"architecture", name:"Architecture", blurb:"Concrete, stone and the way light falls on a built surface.", scene:"concrete", tall:true},
+  {slug:"urban", name:"Urban", blurb:"Streets, signage, traffic and the noise of a city at work.", scene:"city", tall:true},
+  {slug:"landscape", name:"Landscape", blurb:"Coastline, ridgeline and weather, mostly at the edges of the day.", scene:"ridge", tall:false},
+  {slug:"details", name:"Details", blurb:"Fragments — a handrail, a shadow, a repeated shape.", scene:"stairs", tall:true},
+  {slug:"monochrome", name:"Black and white", blurb:"Work made without colour, where form has to carry the picture.", scene:"fog", tall:true}
+];
+
+/* ---------- Prints ----------
+   Each print has several photos: the first is shown on cards,
+   the second appears on hover, all of them appear in the gallery. */
+let PRINTS = [
+  {slug:"louvre", title:"The Louvre glowing beneath a stormy Parisian sky.", place:"Louvre, Paris, France", year:2026,
+   scene:"pyramid", wall:"#2b2723", collections:["new","architecture","urban"], coords:"48.8606° N, 2.3376° E",
+   desc:"The glass pyramid at the Louvre caught between electric light and a darkening sky, photographed from below as storm clouds gathered over the courtyard.",
+   photos:["room","photo"]},
+  {slug:"bekaa", title:"Snow-Capped Peaks of the Bekaa Valley.", place:"Bekaa Valley, Lebanon", year:2025,
+   scene:"mountain", wall:"#2c3038", collections:["new","landscape"], coords:"33.8463° N, 35.9020° E",
+   desc:"Fresh snow on the ridge above the valley, lit for a few minutes through a break in low winter cloud before the weather closed in again.",
+   photos:["room","photo"]},
+  {slug:"sannine", title:"Snow and stone on the timeless slopes of Sannine.", place:"Sannine, Lebanon", year:2025,
+   scene:"snowrock", wall:"#8d8a85", collections:["new","landscape","monochrome"], coords:"33.9403° N, 35.8686° E",
+   desc:"Late snow breaking up across limestone on the upper slopes of Mount Sannine, where the pattern of melt and rock changes by the hour.",
+   photos:["room","photo"]},
+  {slug:"falougha", title:"Golden Horizon Over the High Slopes of Falougha", place:"Falougha, Lebanon", year:2025,
+   scene:"golden", wall:"#2a241e", collections:["new","landscape"], coords:"33.8390° N, 35.7390° E",
+   desc:"The last band of sunset settling over the ridges above Falougha, with the valleys already gone to shadow below.",
+   photos:["room","photo","photo","photo","photo"]},
+  {slug:"underpass", title:"Underpass", place:"Beirut, Lebanon", year:2024,
+   scene:"city", wall:"#2a2a2b", collections:["urban"], coords:"33.8886° N, 35.5130° E",
+   desc:"Traffic light trails running under a concrete flyover after dark.",
+   photos:["room","photo","detail"]},
+  {slug:"red-wine", title:"The Pouring of Red Wine", place:"", year:"",
+   sizes:[{id:"30x45", label:"30 × 45 cm", price:60},{id:"50x75", label:"50 × 75 cm", price:120},{id:"80x120", label:"80 × 120 cm", price:220}],
+   scene:"city", wall:"#2a2424", collections:["new","details"], coords:"",
+   desc:"A close-up shot captures rich, dark red wine as a smooth stream flows down from a bottle into a glass against a dark, moody background. The vivid crimson liquid catches light along its stream and forms a gentle layer of delicate, illuminated bubbles at the surface, contrasting sharply with the deep shadows around it.",
+   photos:["room","photo"]},
+  {slug:"candles", title:"A hundred small prayers, lit one by one", place:"Sacré-Cœur de Montmartre, Paris, France", year:"",
+   scene:"pyramid", wall:"#2a241e", collections:["new","details"], coords:"48.8867° N, 2.3431° E",
+   desc:"Rows of glowing votive candles flicker in the dim light of Sacré-Cœur de Montmartre, a hand reaching in to light another as warm amber glow spills across glass and wax.",
+   photos:["room","photo"]},
+  {slug:"pines", title:"Where the pines keep their secrets.", place:"Falougha, Lebanon", year:"",
+   scene:"ridge", wall:"#3a3833", collections:["new","landscape"], coords:"33.8390° N, 35.7390° E",
+   desc:"A quiet pine forest in Falougha, its tall trunks fading into evening mist, with one glowing patch of grass breaking through the shadows.",
+   photos:["room","photo"]},
+  {slug:"eiffel", title:"Iron reaching for the storm.", place:"Eiffel Tower, Paris, France", year:"",
+   scene:"fog", wall:"#8d8a85", collections:["new","architecture","urban","monochrome"], coords:"48.8584° N, 2.2945° E",
+   desc:"A dramatic upward view of the Eiffel Tower's latticework against a heavy, cloud-streaked sky in monochrome.",
+   photos:["room","photo"]}
+];
+
+/* ---------- Placeholder artwork (replaced by your photos) ---------- */
+const SCENES = {
+  mountain:`<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d323a"/><stop offset="1" stop-color="#6d737c"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#s)"/><path d="M0 120 Q60 90 110 110 T220 95 T400 115 V300 H0Z" fill="#454a52" opacity=".6"/>
+    <path d="M0 200 L40 170 L80 150 L120 120 L150 135 L190 105 L230 125 L270 110 L310 130 L350 115 L400 140 V300 H0Z" fill="#dfe2e4"/>
+    <path d="M0 215 L60 195 L110 200 L170 180 L230 205 L300 190 L400 210 V300 H0Z" fill="#6f7680" opacity=".8"/>
+    <path d="M0 245 Q100 225 200 240 T400 235 V300 H0Z" fill="#1f2328"/>`,
+  ridge:`<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e1ad82"/><stop offset=".6" stop-color="#7d7890"/><stop offset="1" stop-color="#4d5470"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#s)"/><path d="M0 160 Q80 110 150 140 T300 120 T400 150 V300H0Z" fill="#5c6583" opacity=".7"/>
+    <path d="M0 190 Q90 150 170 180 T330 165 T400 185 V300H0Z" fill="#3b4462"/><path d="M0 235 Q120 200 230 230 T400 220 V300H0Z" fill="#232a3e"/>`,
+  pyramid:`<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#171b24"/><stop offset="1" stop-color="#3b4152"/></linearGradient><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3cf86"/><stop offset="1" stop-color="#b87a2e"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#s)"/><path d="M0 60 Q120 30 200 70 T400 50 V0H0Z" fill="#0e1016" opacity=".6"/>
+    <path d="M200 70 L330 240 H70Z" fill="url(#g)"/><path d="M200 70 L200 240 M135 155 H265 M103 198 H297 M168 112 H232" stroke="#6b4a1c" stroke-width="1.2" opacity=".6"/>
+    <rect y="240" width="400" height="60" fill="#0c0d10"/>`,
+  golden:`<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6b5647"/><stop offset=".55" stop-color="#e2a14f"/><stop offset="1" stop-color="#8a5a2e"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#s)"/><path d="M0 170 L70 140 L140 160 L220 130 L300 155 L400 135 V300H0Z" fill="#3d2d22"/>
+    <path d="M0 215 Q120 185 220 210 T400 200 V300H0Z" fill="#1d1612"/>`,
+  snowrock:`<rect width="400" height="300" fill="#cfcfcd"/>
+    <g fill="#3a3a39">${Array.from({length:70},(_,i)=>{const x=(i*53)%400,y=(i*97)%300,w=10+(i*7)%40,h=6+(i*11)%22;return `<ellipse cx="${x}" cy="${y}" rx="${w}" ry="${h}" transform="rotate(${(i*31)%90} ${x} ${y})"/>`}).join("")}</g>`,
+  stairs:`<rect width="400" height="300" fill="#8e8b85"/>${Array.from({length:9},(_,i)=>`<rect x="${40+i*12}" y="${20+i*30}" width="${320-i*24}" height="26" fill="${i%2?"#6c6964":"#a6a39c"}"/>`).join("")}<rect x="190" y="20" width="20" height="280" fill="#3d3b38" opacity=".7"/>`,
+  sea:`<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c7ced4"/><stop offset="1" stop-color="#ead9c1"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#s)"/><rect y="150" width="400" height="70" fill="#7f8c96"/><path d="M0 220 L400 205 V300H0Z" fill="#b2aba0"/>
+    <path d="M0 222 L400 207" stroke="#5c5850" stroke-width="3"/>${Array.from({length:8},(_,i)=>`<rect x="${20+i*50}" y="${190-i}" width="3" height="${30}" fill="#4e4a44"/>`).join("")}`,
+  facade:`<rect width="400" height="300" fill="#bba995"/>${Array.from({length:5},(_,r)=>Array.from({length:6},(_,c)=>`<rect x="${20+c*64}" y="${20+r*56}" width="44" height="34" fill="#4f4538"/><rect x="${20+c*64}" y="${54+r*56}" width="54" height="8" fill="#8e7d69"/>`).join("")).join("")}<path d="M0 0 L400 300 V0Z" fill="#000" opacity=".12"/>`,
+  city:`<rect width="400" height="300" fill="#121418"/><path d="M0 90 H400 V120 H0Z" fill="#26282c"/><path d="M40 120 V300 M360 120 V300" stroke="#1c1e21" stroke-width="30"/>
+    <path d="M0 250 Q200 200 400 230" stroke="#f0a24a" stroke-width="3" fill="none"/><path d="M0 262 Q200 215 400 244" stroke="#e05545" stroke-width="2" fill="none"/><path d="M0 240 Q200 190 400 218" stroke="#f5e1b0" stroke-width="1.5" fill="none"/>`,
+  concrete:`<rect width="400" height="300" fill="#2d2d2c"/><ellipse cx="200" cy="260" rx="200" ry="120" fill="#8a8986" opacity=".5"/><g fill="#1b1b1a" opacity=".5">${Array.from({length:40},(_,i)=>`<circle cx="${(i*71)%400}" cy="${(i*43)%300}" r="${2+(i%5)}"/>`).join("")}</g>`,
+  fog:`<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a9a98"/><stop offset=".6" stop-color="#6c6c6a"/><stop offset="1" stop-color="#2e2e2d"/></linearGradient></defs><rect width="400" height="300" fill="url(#s)"/>`,
+  window:`<rect width="400" height="300" fill="#0d0b09"/><rect x="130" y="70" width="140" height="200" fill="#1e1a15"/><rect x="165" y="100" width="70" height="140" fill="#c6a64a"/><path d="M180 240 L190 150 M205 240 L200 120 M220 240 L225 160" stroke="#3a3a1a" stroke-width="3"/><rect x="165" y="215" width="70" height="25" fill="#6b5436"/>`
+};
+function svgURI(inner, vb="0 0 400 300"){return "data:image/svg+xml;charset=utf-8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}" preserveAspectRatio="xMidYMid slice">${inner}</svg>`)}
+function scenePic(scene){return svgURI(SCENES[scene])}
+function roomPic(scene, wall){
+  const art = `<svg x="110" y="40" width="180" height="120" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">${SCENES[scene]}</svg>`;
+  return svgURI(`<rect width="400" height="300" fill="${wall}"/><rect x="0" y="0" width="40" height="300" fill="#000" opacity=".25"/>
+    <rect x="104" y="34" width="192" height="132" fill="#111"/>${art}
+    <rect y="250" width="400" height="50" fill="#1a1816"/>
+    <rect x="70" y="200" width="260" height="55" rx="8" fill="#2f333a"/><rect x="60" y="185" width="280" height="30" rx="10" fill="#3b4048"/>
+    <rect x="95" y="175" width="40" height="28" rx="6" fill="#58534b"/><rect x="265" y="175" width="40" height="28" rx="6" fill="#4b4f55"/>
+    <rect x="140" y="262" width="120" height="16" fill="#4a3f33"/><path d="M350 90 L350 250 M335 90 L365 90" stroke="#111" stroke-width="3"/>`);
+}
+function detailPic(scene){return svgURI(`<g transform="translate(-200 -150) scale(2)">${SCENES[scene]}</g>`)}
+function paperPic(){return svgURI(`<rect width="400" height="300" fill="#e9e4da"/><rect x="40" y="30" width="320" height="240" fill="#f7f4ee"/><path d="M230 230 q20 -18 40 0 t40 -6" stroke="#3a3a3a" stroke-width="2" fill="none"/><text x="70" y="240" font-family="Georgia" font-size="11" fill="#777">Edition 3 / 25 · 310gsm cotton rag</text>`)}
+
+function imgFor(key, fallback){return IMAGES[key] || fallback}
+function cloudURL(u){
+  u=String(u).trim();
+  // Google Drive share link → direct image link
+  const d=u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?.*id=)([\w-]+)/);
+  if(d) return "https://lh3.googleusercontent.com/d/"+d[1]+"=w2000";
+  // Cloudinary: serve a web-sized, auto-format version unless the link already sets one
+  const c=u.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.*)$/);
+  if(c && !/^[a-z]{1,3}_[^/]*\//.test(c[2])) return c[1]+"f_auto,q_auto,c_limit,w_1800/"+c[2];
+  return u;
+}
+function hasPhotos(p){return !!((p.images&&p.images.length)||IMAGES[p.slug+"-1"])}
+function printImages(p){
+  if(p.images&&p.images.length)
+    return p.images.map((u,i)=>({src:cloudURL(u), alt:i===0?`${p.title} framed on a wall`:p.title}));
+  return (p.photos||["room","photo"]).map((kind,i)=>{
+    const key=`${p.slug}-${i+1}`;
+    const fb = kind==="room"?roomPic(p.scene||"fog",p.wall||"#3a3833"):kind==="detail"?detailPic(p.scene||"fog"):kind==="paper"?paperPic():scenePic(p.scene||"fog");
+    const alt = kind==="room"?`${p.title} framed on a wall`:kind==="detail"?`Close detail of ${p.title}`:kind==="paper"?`Signed reverse of the print`:p.title;
+    return {src:imgFor(key,fb), alt};
+  });
+}
+
+/* ---------- Load the catalog from the cloud ---------- */
+function parseCSV(t){
+  const rows=[];let row=[],f="",q=false;
+  for(let i=0;i<t.length;i++){const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;
+    else if(c===","){row.push(f);f=""}
+    else if(c==="\n"||c==="\r"){if(c==="\r"&&t[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f=""}
+    else f+=c}
+  if(f!==""||row.length){row.push(f);rows.push(row)}
+  return rows.filter(r=>r.some(x=>x.trim()!==""));
+}
+const slugify=t=>String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,60);
+function collectionSlug(name){
+  const n=String(name).trim().toLowerCase(); if(!n) return null;
+  const c=COLLECTIONS.find(c=>c.slug===n||c.name.toLowerCase()===n||(n==="black & white"&&c.slug==="monochrome"));
+  return c?c.slug:null;
+}
+function rowToPrint(r){
+  const g=(...k)=>{for(const x of k){if(r[x]!=null&&String(r[x]).trim()!=="")return String(r[x]).trim()}return ""};
+  const title=g("title","name"); if(!title) return null;
+  if(/^(no|hide|hidden|false|0)$/i.test(g("show","visible"))) return null;
+  const sizes=g("sizes").split(/\||\n/).map(x=>x.trim()).filter(Boolean).map(x=>{const m=x.match(/^(.*?)[=:]\s*\$?\s*([\d.]+)\s*$/);return m?{id:slugify(m[1])||m[1],label:m[1].trim(),price:+m[2]}:null}).filter(Boolean);
+  return {slug:g("slug")||slugify(title), title, place:g("place","location"), year:g("year"),
+    desc:g("description","desc"), coords:g("coordinates","coords"),
+    collections:g("collections","collection").split(/[,|\n]/).map(collectionSlug).filter(Boolean),
+    images:g("images","image","photos").split(/\||\n|\s+(?=https?:)/).map(x=>x.trim()).filter(Boolean),
+    sizes:sizes.length?sizes:undefined};
+}
+async function loadCatalog(){
+  if(!CATALOG_URL) return;
+  try{
+    const url=CATALOG_URL+(CATALOG_URL.includes("?")?"&":"?")+"t="+Date.now();
+    const text=await (await fetch(url,{cache:"no-store"})).text();
+    let rows;
+    if(/^\s*[\[{]/.test(text)){const j=JSON.parse(text);rows=Array.isArray(j)?j:(j.prints||[])}
+    else{const t=parseCSV(text);const head=t[0].map(h=>h.trim().toLowerCase());rows=t.slice(1).map(r=>Object.fromEntries(head.map((h,i)=>[h,r[i]??""])))}
+    const list=rows.map(r=>r.title?rowToPrint(r):null).filter(Boolean);
+    if(list.length){const seen=new Set();list.forEach(p=>{let s=p.slug,k=2;while(seen.has(s))s=p.slug+"-"+k++;p.slug=s;seen.add(s)});PRINTS=list}
+  }catch(e){console.warn("Catalog could not be loaded, using the built-in prints instead.",e)}
+}
+
+/* ---------- Helpers ---------- */
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const whereText = p=>[p.place,p.year].filter(Boolean).join(", ");
+const money = n=>"$"+n.toLocaleString("en-US");
+const sizesFor = p=>(p&&p.sizes)||SIZES;
+const findSize = id=>[SIZES,...PRINTS.map(p=>p.sizes||[])].flat().find(s=>s.id===id);
+const minPrice = Math.min(...SIZES.map(s=>s.price));
+function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+let cart = store("jt-cart") || [];
+function saveCart(){store("jt-cart",cart)}
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2400)}
+
+function card(p){
+  const im = printImages(p);
+  return `<a class="pcard" href="#/print/${p.slug}">
+    <div class="ph"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy">${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy">`:""}</div>
+    <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">From ${money(minPrice)}</p></a>`;
+}
+function collectionCovers(){
+  // Match each collection to a different print (a proper matching, so a
+  // print is only repeated when there's truly no other way). Order is
+  // shuffled, so the covers still vary on every visit.
+  const shuffle=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(v=>v[1]);
+  const opts={}, out={}, owner={};
+  COLLECTIONS.forEach(c=>{const pool=PRINTS.filter(p=>p.collections.includes(c.slug)), real=pool.filter(hasPhotos);opts[c.slug]=shuffle(real.length?real:pool)});
+  const fixed=COLLECTIONS.filter(c=>IMAGES["col-"+c.slug]);
+  fixed.forEach(c=>out[c.slug]=IMAGES["col-"+c.slug]);
+  const todo=shuffle(COLLECTIONS.filter(c=>!IMAGES["col-"+c.slug]));
+  const tryAssign=(c,seen)=>{
+    for(const p of opts[c.slug]){
+      if(seen.has(p.slug))continue; seen.add(p.slug);
+      if(!owner[p.slug]||tryAssign(owner[p.slug],seen)){owner[p.slug]=c;return true}
+    }
+    return false;
+  };
+  const unmatched=todo.filter(c=>!tryAssign(c,new Set()));
+  const usedSrc=new Set();
+  Object.entries(owner).forEach(([slug,c])=>{const src=printImages(PRINTS.find(p=>p.slug===slug))[0].src;out[c.slug]=src;usedSrc.add(src)});
+  // Only if a collection couldn't get its own print: use a different photo of a shared one
+  unmatched.forEach(c=>{
+    let src=null;
+    for(const p of opts[c.slug]){const im=printImages(p).find(im=>!usedSrc.has(im.src));if(im){src=im.src;break}}
+    if(!src) src=opts[c.slug].length?printImages(opts[c.slug][0])[0].src:scenePic(c.scene);
+    usedSrc.add(src);out[c.slug]=src;
+  });
+  return out;
+}
+function ccard(c,covers){
+  return `<a class="ccard ${c.tall?"tall":""}" href="#/collection/${c.slug}"><div class="ph"><img src="${covers[c.slug]}" alt="" loading="lazy"></div>
+    <div class="ov"><h3>${esc(c.name)}</h3><p>${esc(c.blurb)}</p></div></a>`;
+}
+const PROCESS = `<section class="process"><div class="wrap"><h2>How prints are made</h2><div class="grid3">
+  <div><h3>Archival paper</h3><p>Printed on 310gsm acid-free cotton rag with pigment inks rated well beyond a lifetime.</p></div>
+  <div><h3>Small editions</h3><p>Each size is limited and numbered. Once an edition closes it is not reprinted.</p></div>
+  <div><h3>Signed and shipped flat</h3><p>Signed on the reverse, sleeved, and shipped flat in a rigid board for sizes up to 50 × 70.</p></div>
+</div></div></section>`;
+const ARROW = `<span aria-hidden="true">→</span>`;
+
+/* ---------- Pages ---------- */
+function heroSlides(){return PRINTS.filter(hasPhotos)}
+function heroCaption(p){return esc(p.title.replace(/\.$/,""))+(whereText(p)?" – "+esc(whereText(p)):"")}
+let heroTimer=null;
+function home(){
+  const hero = PRINTS.find(p=>p.slug==="bekaa");
+  return `
+  <section class="hero" aria-roledescription="carousel" aria-label="Featured prints">
+    <div class="ph hero-stage">
+      ${heroSlides().map((p,i)=>`<a class="hero-slide${i?"":" on"}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" src="${printImages(p)[0].src}" alt=""><span class="pair-wrap"><img class="fit main" src="${printImages(p)[0].src}" alt="${esc(p.title)}, framed on a wall">${printImages(p)[1]?`<img class="fit second" src="${printImages(p)[1].src}" alt="${esc(printImages(p)[1].alt)}">`:""}</span></a>`).join("")}
+      <div class="hero-dots" role="group" aria-label="Choose a print">
+        ${heroSlides().map((p,i)=>`<button data-h="${i}" aria-label="Show ${esc(p.title)}" aria-current="${i===0}"></button>`).join("")}
+      </div>
+    </div>
+    <div class="copy">
+      <p class="caption" id="heroCap" aria-live="polite">${heroCaption(heroSlides()[0])}</p>
+      <h1>Every print begins somewhere real.</h1>
+      <p class="lede">Photographs made on location and printed in small, numbered editions on archival cotton paper.</p>
+      <a href="#/shop" class="btn">Shop the collection</a>
+    </div>
+  </section>
+  <section class="block"><div class="wrap">
+    <div class="rule sec-head"><h2>Currently on the wall</h2></div>
+    <div class="grid4">${PRINTS.slice(0,4).map(card).join("")}</div>
+    <div class="more"><a class="small-link" href="#/shop">See all prints ${ARROW}</a></div>
+  </div></section>
+  <section class="band"><div class="wrap">
+    <div class="sec-head"><h2>Collections</h2><p>Work grouped by what it looks at.</p></div>
+    <div class="cgrid">${(cv=>COLLECTIONS.map(c=>ccard(c,cv)).join(""))(collectionCovers())}</div>
+  </div></section>
+  <div class="wrap about">
+    <div>
+      <h2>About the photography</h2>
+      <p>Nothing on this site is generated, licensed or bought in. Every image began as a photograph I took myself, standing in the place you are looking at, usually waiting for the light to do something worth keeping.</p>
+      <p>Some of these places are well known. Most are not. A stairwell on the way to somewhere else, a shoreline an hour before anyone arrives, a facade that only works in November.</p>
+      <p>The photograph is the record that the moment happened. Each file is printed on archival cotton paper, checked by hand, and signed on the reverse.</p>
+      <a class="small-link" href="#/about" style="margin-top:10px">Read more about the work ${ARROW}</a>
+    </div>
+    <div class="ph"><img src="${imgFor("about",scenePic("window"))}" alt="Light through a doorway in a dark stone room"></div>
+  </div>
+  ${PROCESS}`;
+}
+
+function shop(filter){
+  const list = filter?PRINTS.filter(p=>p.collections.includes(filter)):PRINTS;
+  return `<div class="wrap"><div class="phead"><h1>All prints</h1><p>Every photograph is available in three sizes, as a print alone or framed in black or natural oak.</p></div>
+  <div class="filters" role="group" aria-label="Filter by collection">
+    <button class="chip" data-f="" aria-pressed="${!filter}">All</button>
+    ${COLLECTIONS.map(c=>`<button class="chip" data-f="${c.slug}" aria-pressed="${filter===c.slug}">${esc(c.name)}</button>`).join("")}
+  </div>
+  <section class="block"><div class="grid4">${list.map(card).join("")}</div></section></div>`;
+}
+
+function collections(){
+  return `<div class="wrap"><div class="phead"><h1>Collections</h1><p>Work grouped by what it looks at.</p></div>
+  <section class="block"><div class="cgrid">${(cv=>COLLECTIONS.map(c=>ccard(c,cv)).join(""))(collectionCovers())}</div></section></div>`;
+}
+
+function collection(slug){
+  const c = COLLECTIONS.find(x=>x.slug===slug); if(!c) return notFound();
+  const list = PRINTS.filter(p=>p.collections.includes(slug));
+  return `<div class="wrap"><div class="phead"><a class="small-link" href="#/collections">← Collections</a><h1 style="margin-top:18px">${esc(c.name)}</h1><p>${esc(c.blurb)}</p></div>
+  <section class="block">${list.length?`<div class="grid4">${list.map(card).join("")}</div>`:`<p class="empty">No prints in this collection yet.</p>`}</section></div>`;
+}
+
+function product(slug){
+  const p = PRINTS.find(x=>x.slug===slug); if(!p) return notFound();
+  const im = printImages(p);
+  const related = PRINTS.filter(x=>x!==p && x.collections.some(c=>p.collections.includes(c))).slice(0,4);
+  const cols = p.collections.map(s=>COLLECTIONS.find(c=>c.slug===s)).map(c=>`<a href="#/collection/${c.slug}" style="text-decoration:underline;text-underline-offset:3px">${esc(c.name)}</a>`).join(", ");
+  return `<div class="wrap"><div class="product">
+    <div class="gallery" data-i="0">
+      <div class="stage">
+        ${im.map((m,i)=>`<div class="ph" ${i?"hidden":""}><img src="${m.src}" alt="${esc(m.alt)}"></div>`).join("")}
+        ${im.length>1?`<button class="gnav prev" aria-label="Previous photo"><svg viewBox="0 0 22 40" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 3 4 20l14 17"/></svg></button><button class="gnav next" aria-label="Next photo"><svg viewBox="0 0 22 40" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 3l14 17L4 37"/></svg></button>`:""}
+        <span class="count"><span class="ci">1</span> / ${im.length}</span>
+      </div>
+      <div class="thumbs">${im.map((m,i)=>`<button aria-label="Show photo ${i+1}" aria-current="${i===0}" data-t="${i}"><div class="ph"><img src="${m.src}" alt=""></div></button>`).join("")}</div>
+    </div>
+    <div class="pinfo">
+      <h1>${esc(p.title)}</h1>
+      ${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}
+      <p class="amount" id="amount">${money(minPrice)}</p>
+      <p class="desc">${esc(p.desc)}</p>
+      <form id="buy">
+        <fieldset><legend>Print size <em id="sizeLbl">Select</em></legend><div class="opts">
+          ${sizesFor(p).map(s=>`<label><input type="radio" name="size" value="${s.id}"><span>${s.label}</span></label>`).join("")}</div></fieldset>
+        <fieldset><legend>Finish <em id="finLbl">Select</em></legend><div class="opts">
+          ${FINISHES.map(f=>`<label><input type="radio" name="finish" value="${f.id}"><span>${f.label}</span></label>`).join("")}</div></fieldset>
+        <div class="buyrow">
+          <div class="qty"><button type="button" data-q="-1" aria-label="Decrease quantity">−</button><output id="qty">1</output><button type="button" data-q="1" aria-label="Increase quantity">+</button></div>
+          <a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2Z"/></svg>Contact on WhatsApp</a>
+        </div>
+        <p class="hint" id="hint"></p>
+      </form>
+      <dl class="specs">
+        ${p.coords?`<div><dt>Coordinates</dt><dd>${esc(p.coords)}</dd></div>`:""}
+        <div><dt>Availability</dt><dd>Made to order</dd></div>
+        <div><dt>Collections</dt><dd>${cols}</dd></div>
+      </dl>
+    </div>
+  </div>
+  ${related.length?`<section class="block"><div class="rule sec-head"><h2>Related work</h2></div><div class="grid4">${related.map(card).join("")}</div></section>`:""}
+  </div>`;
+}
+
+function about(){
+  return `<div class="wrap"><div class="phead"><h1>About the photography</h1></div>
+  <div class="about" style="padding-bottom:60px">
+    <div class="prose">
+      <p>Nothing on this site is generated, licensed or bought in. Every image began as a photograph I took myself, standing in the place you are looking at, usually waiting for the light to do something worth keeping.</p>
+      <p>Some of these places are well known. Most are not. A stairwell on the way to somewhere else, a shoreline an hour before anyone arrives, a facade that only works in November. The photograph is the record that the moment happened.</p>
+      <p>Each file is printed on archival cotton paper, checked by hand, and signed on the reverse.</p>
+      <a href="#/shop" class="btn">Browse the prints</a>
+    </div>
+    <div class="ph" style="aspect-ratio:3/4"><img src="${imgFor("about",scenePic("window"))}" alt="Light through a doorway in a dark stone room"></div>
+  </div></div>${PROCESS}`;
+}
+
+function contact(){
+  return `<div class="wrap"><div class="phead"><h1>Contact</h1><p>Questions about a print, a custom size or a commission. Replies usually come within two working days.</p></div>
+  <form class="form" id="contact">
+    <label>Name<input name="name" required autocomplete="name"></label>
+    <label>Email<input name="email" type="email" required autocomplete="email"></label>
+    <label>About<select name="topic"><option>A print or order</option><option>Custom size</option><option>Commission</option><option>Something else</option></select></label>
+    <label>Message<textarea name="message" required></textarea></label>
+    <div><button class="btn" type="submit">Send message</button></div>
+    <p style="color:var(--muted);font-size:14px">Or write to <a href="mailto:hello@example.com" style="text-decoration:underline">hello@example.com</a>, or message the studio on <a href="#" data-wa style="text-decoration:underline">WhatsApp</a>.</p>
+  </form></div>`;
+}
+
+function cartPage(){
+  if(!cart.length) return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div><div class="empty"><p>Your cart is empty. Choose a print and a size to add it here.</p><a class="btn" href="#/shop">Browse prints</a></div></div>`;
+  const total = cart.reduce((a,it)=>a+it.price*it.qty,0);
+  return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div>
+  ${cart.map((it,i)=>{const p=PRINTS.find(x=>x.slug===it.slug);if(!p)return "";const im=printImages(p);
+    return `<div class="cart-row"><a href="#/print/${p.slug}" class="ph"><img src="${im[0].src}" alt=""></a>
+    <div><h3>${esc(p.title)}</h3><p class="meta">${esc(findSize(it.size).label)}, ${esc(FINISHES.find(f=>f.id===it.finish).label.toLowerCase())}</p>
+      <div class="qty" style="display:inline-flex;margin-top:8px"><button data-cq="${i}" data-d="-1" aria-label="Decrease">−</button><output>${it.qty}</output><button data-cq="${i}" data-d="1" aria-label="Increase">+</button></div></div>
+    <div class="right">${money(it.price*it.qty)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
+  <div class="cart-foot"><div><p class="total">Subtotal ${money(total)}</p><p style="color:var(--muted);font-size:14px">Shipping is calculated when the studio confirms your order.</p></div>
+  <a class="btn" id="checkout" href="#">Send order to the studio</a></div></div>`;
+}
+function notFound(){return `<div class="wrap"><div class="phead"><h1>This page doesn't exist</h1><p>The link may be old. Go back to the prints to keep browsing.</p></div><div class="empty"><a class="btn" href="#/shop">See all prints</a></div></div>`}
+
+/* ---------- Router ---------- */
+function route(){
+  clearInterval(heroTimer);
+  const parts = (location.hash.replace(/^#\/?/,"")||"").split("/");
+  const [page, arg] = parts;
+  let html, title="Joe Tanos — Photographs taken on location, printed in small editions.";
+  if(page===""){html=home()}
+  else if(page==="shop"){html=shop(arg);title="All prints — Joe Tanos"}
+  else if(page==="collections"){html=collections();title="Collections — Joe Tanos"}
+  else if(page==="collection"){html=collection(arg);const c=COLLECTIONS.find(x=>x.slug===arg);if(c)title=c.name+" — Joe Tanos"}
+  else if(page==="print"){html=product(arg);const p=PRINTS.find(x=>x.slug===arg);if(p)title=`${p.title} — Joe Tanos`}
+  else if(page==="about"){html=about();title="About — Joe Tanos"}
+  else if(page==="contact"){html=contact();title="Contact — Joe Tanos"}
+  else if(page==="cart"){html=cartPage();title="Cart — Joe Tanos"}
+  else html=notFound();
+  $("#main").innerHTML=html; document.title=title; window.scrollTo(0,0);
+  document.querySelectorAll("nav.main a").forEach(a=>{const h=a.getAttribute("href").slice(2);a.toggleAttribute("aria-current",page===h||(h==="shop"&&page==="print")||(h==="collections"&&page==="collection"));if(a.hasAttribute("aria-current"))a.setAttribute("aria-current","page")});
+  $("#nav").classList.remove("open");$(".menu-btn").setAttribute("aria-expanded","false");
+  document.querySelectorAll("#main [data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
+  bind(page,arg);
+}
+
+function bind(page,arg){
+  if(page===""){
+    const slides=[...document.querySelectorAll(".hero-slide")], dots=[...document.querySelectorAll(".hero-dots button")], list=heroSlides(), cap=$("#heroCap");
+    let i=0;
+    slides.forEach(sl=>{const m=sl.querySelector("img.main"), sec=sl.querySelector("img.second");
+      const check=()=>{if(sec&&m.naturalHeight>m.naturalWidth)sl.classList.add("pair")};
+      m.complete?check():m.addEventListener("load",check)});
+    const show=n=>{i=(n+slides.length)%slides.length;
+      slides.forEach((sl,k)=>{sl.classList.toggle("on",k===i);sl.setAttribute("aria-hidden",k!==i);sl.tabIndex=k===i?0:-1});
+      dots.forEach((d,k)=>d.setAttribute("aria-current",k===i));
+      cap.style.opacity=0;setTimeout(()=>{cap.innerHTML=heroCaption(list[i]);cap.style.opacity=1},200)};
+    const start=()=>{clearInterval(heroTimer);if(slides.length>1)heroTimer=setInterval(()=>show(i+1),5000)};
+    dots.forEach(d=>d.onclick=()=>{show(+d.dataset.h);start()});
+    const stage=$(".hero-stage");
+    stage.addEventListener("mouseenter",()=>clearInterval(heroTimer));
+    stage.addEventListener("mouseleave",start);
+    stage.addEventListener("focusin",()=>clearInterval(heroTimer));
+    stage.addEventListener("focusout",start);
+    let x0=null;stage.addEventListener("touchstart",e=>x0=e.touches[0].clientX,{passive:true});
+    stage.addEventListener("touchend",e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>40){show(i+(dx<0?1:-1));start()}x0=null});
+    start();
+  }
+  if(page==="shop") document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{location.hash="#/shop"+(b.dataset.f?"/"+b.dataset.f:"")});
+  if(page==="print"){
+    const g=$(".gallery"); if(!g) return;
+    const slides=[...g.querySelectorAll(".stage .ph")], thumbs=[...g.querySelectorAll(".thumbs button")];
+    const show=i=>{i=(i+slides.length)%slides.length;g.dataset.i=i;slides.forEach((s,k)=>s.hidden=k!==i);thumbs.forEach((t,k)=>t.setAttribute("aria-current",k===i));g.querySelector(".ci").textContent=i+1};
+    g.querySelector(".prev")?.addEventListener("click",()=>show(+g.dataset.i-1));
+    g.querySelector(".next")?.addEventListener("click",()=>show(+g.dataset.i+1));
+    thumbs.forEach(t=>t.onclick=()=>show(+t.dataset.t));
+    g.addEventListener("keydown",e=>{if(e.key==="ArrowLeft")show(+g.dataset.i-1);if(e.key==="ArrowRight")show(+g.dataset.i+1)});
+    let x0=null;g.querySelector(".stage").addEventListener("touchstart",e=>x0=e.touches[0].clientX,{passive:true});
+    g.querySelector(".stage").addEventListener("touchend",e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>40)show(+g.dataset.i+(dx<0?1:-1));x0=null});
+
+    const f=$("#buy"); let qty=1;
+    const SZ=sizesFor(PRINTS.find(x=>x.slug===arg));
+    const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return (s?s.price:minPrice)+(fi?fi.price:0)};
+    const upd=()=>{$("#amount").textContent=money(price()*qty);const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);$("#sizeLbl").textContent=s?s.label:"Select";$("#finLbl").textContent=fi?fi.label:"Select";$("#hint").textContent=""};
+    f.addEventListener("change",upd);
+    f.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
+    const p=PRINTS.find(x=>x.slug===arg), wa=$("#waBtn");
+    const waUpd=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);
+      let msg=`Hello, I'm interested in the print "${p.title}"${whereText(p)?` (${whereText(p)})`:""}.`;
+      if(s||fi) msg+=`\n\nSize: ${s?s.label:"not chosen yet"}\nFinish: ${fi?fi.label:"not chosen yet"}\nQuantity: ${qty}\nPrice shown: ${money(price()*qty)}`;
+      msg+=`\n\n${location.href}`;
+      wa.href=waLink(msg);};
+    f.addEventListener("change",waUpd);
+    f.querySelectorAll("[data-q]").forEach(b=>b.addEventListener("click",waUpd));
+    f.onsubmit=e=>e.preventDefault();
+    waUpd();
+  }
+  if(page==="cart"){
+    document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.rm,1);saveCart();route()});
+    document.querySelectorAll("[data-cq]").forEach(b=>b.onclick=()=>{const it=cart[+b.dataset.cq];it.qty=Math.max(1,it.qty+ +b.dataset.d);saveCart();route()});
+    const c=$("#checkout"); if(c){
+      const lines=cart.map(it=>{const p=PRINTS.find(x=>x.slug===it.slug);return `${it.qty} × ${p.title} (${findSize(it.size).label}, ${FINISHES.find(f=>f.id===it.finish).label}) — ${money(it.price*it.qty)}`});
+      const total=cart.reduce((a,it)=>a+it.price*it.qty,0);
+      c.href="mailto:hello@example.com?subject="+encodeURIComponent("Print order")+"&body="+encodeURIComponent("Hello,\n\nI'd like to order:\n\n"+lines.join("\n")+"\n\nSubtotal: "+money(total)+"\n\nShipping address:\n");
+    }
+  }
+  if(page==="contact"){
+    $("#contact").onsubmit=e=>{e.preventDefault();const d=new FormData(e.target);
+      window.location.href="mailto:hello@example.com?subject="+encodeURIComponent(d.get("topic")+" — "+d.get("name"))+"&body="+encodeURIComponent(d.get("message")+"\n\n"+d.get("name")+"\n"+d.get("email"));};
+  }
+}
+
+/* ---------- Boot ---------- */
+function logoHTML(){return IMAGES.logo?`<img src="${IMAGES.logo}" alt="Joe Tanos">`:"Joe Tanos"}
+document.querySelectorAll("[data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
+$("#logo").innerHTML=logoHTML(); $("#logo2").innerHTML=logoHTML();
+$(".menu-btn").onclick=e=>{const o=$("#nav").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",o)};
+if(!store("jt-cookie")) $("#cookie").hidden=false;
+document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-cookie",b.dataset.c);$("#cookie").hidden=true});
+window.addEventListener("hashchange",route);
+window.addEventListener("scroll",()=>document.querySelector("header.site").classList.toggle("scrolled",scrollY>4),{passive:true});
+saveCart();
+$("#main").innerHTML='<div class="wrap" style="padding:120px 0;text-align:center;color:var(--muted)">Loading…</div>';
+loadCatalog().then(route);
+</script>
+</body>
+</html>
