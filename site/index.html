@@ -687,8 +687,8 @@ function product(slug){
     </div>
   </div>
   <nav class="pnav" aria-label="More prints">
-    <a class="btn ghost" href="#/print/${prev.slug}" rel="prev">&larr; View previous print<span>${esc(prev.title)}</span></a>
-    <a class="btn ghost" href="#/print/${next.slug}" rel="next">View next print &rarr;<span>${esc(next.title)}</span></a>
+    <a class="btn ghost" href="#/print/${prev.slug}" rel="prev">&larr; View previous print</a>
+    <a class="btn ghost" href="#/print/${next.slug}" rel="next">View next print &rarr;</a>
   </nav>
   ${related.length?`<section class="block"><div class="rule sec-head"><h2>Related work</h2></div><div class="grid4">${related.map(card).join("")}</div></section>`:""}
   </div>`;
