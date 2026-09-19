@@ -307,7 +307,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
 const IMAGES = {
   "logo": "images/logo.png",
   hero: null,
-  about: null,
+  about: "images/about.jpg",
   "col-new": null, "col-architecture": null, "col-urban": null,
   "col-landscape": null, "col-details": null, "col-monochrome": null,
   "louvre-1": "images/louvre-1.jpg",
@@ -621,7 +621,7 @@ function home(){
       <p>The photograph is the record that the moment happened. Each file is printed on archival cotton paper, checked by hand, and signed on the reverse.</p>
       <a class="small-link" href="#/about" style="margin-top:10px">Read more about the work ${ARROW}</a>
     </div>
-    <div class="ph"><img src="${imgFor("about",scenePic("window"))}" alt="Light through a doorway in a dark stone room"></div>
+    <div class="ph"><img src="${imgFor("about",scenePic("window"))}" alt="The Milky Way above a dark mountain ridge"></div>
   </div>
   ${PROCESS}`;
 }
@@ -704,7 +704,7 @@ function about(){
       <p>Each file is printed on archival cotton paper, checked by hand, and signed on the reverse.</p>
       <a href="#/shop" class="btn">Browse the prints</a>
     </div>
-    <div class="ph" style="aspect-ratio:3/4"><img src="${imgFor("about",scenePic("window"))}" alt="Light through a doorway in a dark stone room"></div>
+    <div class="ph" style="aspect-ratio:3/4"><img src="${imgFor("about",scenePic("window"))}" alt="The Milky Way above a dark mountain ridge"></div>
   </div></div>${PROCESS}`;
 }
 
