@@ -191,6 +191,11 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .btn.wa svg{width:17px;height:17px;flex-shrink:0}
 .btn.share{display:inline-flex;align-items:center;gap:10px;margin:0 0 26px;cursor:pointer}
 .btn.share svg{width:16px;height:16px}
+.pnav{display:flex;justify-content:space-between;gap:16px;margin:56px 0 8px;padding-top:28px;border-top:1px solid var(--line)}
+.pnav .btn{flex:1;max-width:50%;display:flex;flex-direction:column;gap:6px;padding:16px 20px}
+.pnav .btn:last-child{text-align:right}
+.pnav .btn span{font-family:var(--serif,inherit);font-size:15px;letter-spacing:0;text-transform:none;color:var(--muted)}
+@media(max-width:600px){.pnav{flex-direction:column}.pnav .btn{max-width:none}.pnav .btn:last-child{text-align:left}}
 .hint{font-size:13px;color:var(--muted);min-height:22px}
 dl.specs{border-top:1px solid var(--line);margin-top:24px}
 dl.specs div{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;gap:16px}
@@ -645,6 +650,7 @@ function collection(slug){
 function product(slug){
   const p = PRINTS.find(x=>x.slug===slug); if(!p) return notFound();
   const im = printImages(p);
+  const pi = PRINTS.indexOf(p), prev = PRINTS[(pi-1+PRINTS.length)%PRINTS.length], next = PRINTS[(pi+1)%PRINTS.length];
   const related = PRINTS.filter(x=>x!==p && x.collections.some(c=>p.collections.includes(c))).slice(0,4);
   const cols = p.collections.map(s=>COLLECTIONS.find(c=>c.slug===s)).map(c=>`<a href="#/collection/${c.slug}" style="text-decoration:underline;text-underline-offset:3px">${esc(c.name)}</a>`).join(", ");
   return `<div class="wrap"><div class="product">
@@ -680,6 +686,10 @@ function product(slug){
       </dl>
     </div>
   </div>
+  <nav class="pnav" aria-label="More prints">
+    <a class="btn ghost" href="#/print/${prev.slug}" rel="prev">&larr; View previous print<span>${esc(prev.title)}</span></a>
+    <a class="btn ghost" href="#/print/${next.slug}" rel="next">View next print &rarr;<span>${esc(next.title)}</span></a>
+  </nav>
   ${related.length?`<section class="block"><div class="rule sec-head"><h2>Related work</h2></div><div class="grid4">${related.map(card).join("")}</div></section>`:""}
   </div>`;
 }
