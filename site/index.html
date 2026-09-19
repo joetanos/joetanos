@@ -189,6 +189,8 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .buyrow .btn{flex:1;padding:15px}
 .btn.wa{display:flex;align-items:center;justify-content:center;gap:10px}
 .btn.wa svg{width:17px;height:17px;flex-shrink:0}
+.btn.share{display:inline-flex;align-items:center;gap:10px;margin:0 0 26px;cursor:pointer}
+.btn.share svg{width:16px;height:16px}
 .hint{font-size:13px;color:var(--muted);min-height:22px}
 dl.specs{border-top:1px solid var(--line);margin-top:24px}
 dl.specs div{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;gap:16px}
@@ -670,6 +672,7 @@ function product(slug){
         </div>
         <p class="hint" id="hint"></p>
       </form>
+      <button type="button" class="btn ghost share" id="shareBtn" data-title="${esc(p.title)}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Share this print</button>
       <dl class="specs">
         ${p.coords?`<div><dt>Coordinates</dt><dd>${esc(p.coords)}</dd></div>`:""}
         <div><dt>Availability</dt><dd>Made to order</dd></div>
@@ -766,6 +769,13 @@ function bind(page,arg){
   }
   if(page==="shop") document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{location.hash="#/shop"+(b.dataset.f?"/"+b.dataset.f:"")});
   if(page==="print"){
+    const sb=$("#shareBtn");
+    if(sb) sb.onclick=async()=>{
+      const data={title:sb.dataset.title+" – Joe Tanos",url:location.href};
+      try{ if(navigator.share){await navigator.share(data);return} }catch(e){ if(e&&e.name==="AbortError") return }
+      try{ await navigator.clipboard.writeText(data.url); toast("Link copied") }
+      catch(e){ prompt("Copy this link:",data.url) }
+    };
     const g=$(".gallery"); if(!g) return;
     const slides=[...g.querySelectorAll(".stage .ph")], thumbs=[...g.querySelectorAll(".thumbs button")];
     const show=i=>{i=(i+slides.length)%slides.length;g.dataset.i=i;slides.forEach((s,k)=>s.hidden=k!==i);thumbs.forEach((t,k)=>t.setAttribute("aria-current",k===i));g.querySelector(".ci").textContent=i+1};
