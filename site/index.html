@@ -182,6 +182,12 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .opts span{display:block;border:1px solid var(--line);padding:9px 14px;font-family:var(--sans);font-size:12.5px;cursor:pointer}
 .opts input:checked+span{border-color:var(--ink);background:var(--ink);color:var(--bg)}
 .opts input:focus-visible+span{outline:2px solid var(--ink);outline-offset:2px}
+.custom-dims{display:flex;align-items:flex-end;gap:10px;margin-top:12px;font-family:var(--sans);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.custom-dims[hidden]{display:none}
+.custom-dims label{display:flex;flex-direction:column;gap:6px}
+.custom-dims input{width:110px;border:1px solid var(--line);background:transparent;color:inherit;padding:9px 12px;font-family:var(--sans);font-size:14px}
+.custom-dims input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.custom-dims .x{padding-bottom:10px}
 .buyrow{display:flex;gap:10px;margin-bottom:10px}
 .qty{display:flex;border:1px solid var(--line);align-items:center}
 .qty button{width:38px;height:46px;font-family:var(--sans)}
@@ -535,7 +541,9 @@ const $ = s=>document.querySelector(s);
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const whereText = p=>[p.place,p.year].filter(Boolean).join(", ");
 const money = n=>"$"+n.toLocaleString("en-US");
+const CUSTOM = {id:"custom", label:"Custom", custom:true};
 const sizesFor = p=>(p&&p.sizes)||SIZES;
+const sizeOptions = p=>[...sizesFor(p),CUSTOM];
 const findSize = id=>[SIZES,...PRINTS.map(p=>p.sizes||[])].flat().find(s=>s.id===id);
 const minPrice = Math.min(...SIZES.map(s=>s.price));
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
@@ -679,7 +687,8 @@ function product(slug){
       <p class="desc">${esc(p.desc)}</p>
       <form id="buy">
         <fieldset><legend>Print size <em id="sizeLbl">Select</em></legend><div class="opts">
-          ${sizesFor(p).map(s=>`<label><input type="radio" name="size" value="${s.id}"><span>${s.label}</span></label>`).join("")}</div></fieldset>
+          ${sizeOptions(p).map(s=>`<label><input type="radio" name="size" value="${s.id}"><span>${s.label}</span></label>`).join("")}</div>
+          <div class="custom-dims" id="customDims" hidden><label>Length (cm)<input type="number" name="cl" min="1" max="500" step="any" inputmode="decimal"></label><span class="x" aria-hidden="true">×</span><label>Width (cm)<input type="number" name="cw" min="1" max="500" step="any" inputmode="decimal"></label></div></fieldset>
         <fieldset><legend>Finish <em id="finLbl">Select</em></legend><div class="opts">
           ${FINISHES.map(f=>`<label><input type="radio" name="finish" value="${f.id}"><span>${f.label}</span></label>`).join("")}</div></fieldset>
         <div class="buyrow">
@@ -810,18 +819,22 @@ function bind(page,arg){
     g.querySelector(".stage").addEventListener("touchend",e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>40)show(+g.dataset.i+(dx<0?1:-1));x0=null});
 
     const f=$("#buy"); let qty=1;
-    const SZ=sizesFor(PRINTS.find(x=>x.slug===arg));
-    const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return (s?s.price:minPrice)+(fi?fi.price:0)};
-    const upd=()=>{$("#amount").textContent=money(price()*qty);const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);$("#sizeLbl").textContent=s?s.label:"Select";$("#finLbl").textContent=fi?fi.label:"Select";$("#hint").textContent=""};
-    f.addEventListener("change",upd);
+    const SZ=sizeOptions(PRINTS.find(x=>x.slug===arg));
+    const sel=()=>SZ.find(x=>x.id===f.size.value);
+    const dims=()=>{const l=+f.cl.value,w=+f.cw.value;return l>0&&w>0?`${l} × ${w} cm`:""};
+    const sizeText=s=>!s?"":s.custom?(dims()?`Custom, ${dims()}`:"Custom"):s.label;
+    const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return (s&&!s.custom?s.price:minPrice)+(fi?fi.price:0)};
+    const upd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
+      $("#customDims").hidden=!cu;$("#amount").hidden=cu;$("#amount").textContent=money(price()*qty);$("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";$("#hint").textContent=""};
+    f.addEventListener("change",upd);f.addEventListener("input",upd);
     f.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
     const p=PRINTS.find(x=>x.slug===arg), wa=$("#waBtn");
-    const waUpd=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);
+    const waUpd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
       let msg=`Hello, I'm interested in the print "${p.title}"${whereText(p)?` (${whereText(p)})`:""}.`;
-      if(s||fi) msg+=`\n\nSize: ${s?s.label:"not chosen yet"}\nFinish: ${fi?fi.label:"not chosen yet"}\nQuantity: ${qty}\nPrice shown: ${money(price()*qty)}`;
+      if(s||fi) msg+=`\n\nSize: ${s?sizeText(s):"not chosen yet"}\nFinish: ${fi?fi.label:"not chosen yet"}\nQuantity: ${qty}${cu?"":`\nPrice shown: ${money(price()*qty)}`}`;
       msg+=`\n\n${location.href}`;
       wa.href=waLink(msg);};
-    f.addEventListener("change",waUpd);
+    f.addEventListener("change",waUpd);f.addEventListener("input",waUpd);
     f.querySelectorAll("[data-q]").forEach(b=>b.addEventListener("click",waUpd));
     f.onsubmit=e=>e.preventDefault();
     waUpd();
