@@ -106,6 +106,9 @@ section.block{padding:0 0 80px}
 .pcard .ph{aspect-ratio:1/0.92;margin-bottom:12px}
 .pcard .ph img{transition:opacity .35s}
 .pcard .ph .alt{position:absolute;inset:0;opacity:0}
+.pcard .ph.portrait::before{content:"";position:absolute;inset:0;background:var(--bg) center/cover;filter:blur(24px) brightness(.55);transform:scale(1.2)}
+.pcard .ph img.pt{position:relative;object-fit:contain}
+.pcard .ph img.alt.pt{position:absolute}
 .pcard:hover .ph .alt{opacity:1}
 .pcard h3{font-size:12.5px;font-weight:500;letter-spacing:0;line-height:1.35;margin-bottom:4px}
 .pcard .where{font-style:italic;font-size:11.5px;color:var(--muted);margin-bottom:6px}
@@ -551,13 +554,15 @@ let cart = store("jt-cart") || [];
 function saveCart(){store("jt-cart",cart)}
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2400)}
 
+function cardFit(im){if(im.naturalHeight>im.naturalWidth*1.05){im.classList.add("pt");if(!im.classList.contains("alt"))im.parentNode.classList.add("portrait")}}
 const CARD_COVER={eiffel:1}; // which photo (0-based) the grid card shows; the print page keeps its own order
 function card(p){
   const all = printImages(p);
   const ci = Math.min(CARD_COVER[p.slug]||0, all.length-1);
   const im = [all[ci], ...all.filter((_,i)=>i!==ci)];
+  const fit = p.slug in CARD_COVER ? 'onload="cardFit(this)"' : ""; // show the whole tall photo instead of cropping it
   return `<a class="pcard" href="#/print/${p.slug}">
-    <div class="ph"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy">${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy">`:""}</div>
+    <div class="ph" style="--bg:url('${im[0].src}')"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy" ${fit}>${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy" ${fit}>`:""}</div>
     <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">From ${money(minPrice)}</p></a>`;
 }
 function collectionCovers(){
