@@ -548,7 +548,7 @@ const sizesFor = p=>(p&&p.sizes)||SIZES;
 const sizeOptions = p=>[...sizesFor(p),CUSTOM];
 const findSize = id=>[SIZES,...PRINTS.map(p=>p.sizes||[])].flat().find(s=>s.id===id);
 // Final prices by size position (small, medium, large) and finish. Applies to every print, whatever sizes the sheet lists.
-const PRICE_TABLE = [{print:25,oak:35},{print:38,oak:50},{print:60,oak:75}];
+const PRICE_TABLE = [{print:20,oak:40},{print:30,oak:55},{print:60,oak:80}];
 const priceOf = (sizeIdx,finId)=>(PRICE_TABLE[sizeIdx]||PRICE_TABLE[PRICE_TABLE.length-1])[finId];
 const fromPrice = Math.min(...PRICE_TABLE.flatMap(r=>Object.values(r)));
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
