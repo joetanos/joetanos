@@ -368,8 +368,7 @@ const SIZES = [
   {id:"70x100", label:"70 × 100 cm", price:220}
 ];
 const FINISHES = [
-  {id:"print", label:"Canvas Print Only", price:0},
-  {id:"black", label:"Black frame", price:90},
+  {id:"print", label:"Canvas Print Only", price:55}, // half the price of the gallery wrapped canvas
   {id:"oak", label:"Gallery Wrapped Canvas", price:110}
 ];
 
@@ -549,6 +548,8 @@ const sizesFor = p=>(p&&p.sizes)||SIZES;
 const sizeOptions = p=>[...sizesFor(p),CUSTOM];
 const findSize = id=>[SIZES,...PRINTS.map(p=>p.sizes||[])].flat().find(s=>s.id===id);
 const minPrice = Math.min(...SIZES.map(s=>s.price));
+const minFinish = Math.min(...FINISHES.map(f=>f.price));
+const fromPrice = minPrice+minFinish;
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
 let cart = store("jt-cart") || [];
 function saveCart(){store("jt-cart",cart)}
@@ -563,7 +564,7 @@ function card(p){
   const fit = p.slug in CARD_COVER ? 'onload="cardFit(this)"' : ""; // show the whole tall photo instead of cropping it
   return `<a class="pcard" href="#/print/${p.slug}">
     <div class="ph" style="--bg:url('${im[0].src}')"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy" ${fit}>${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy" ${fit}>`:""}</div>
-    <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">From ${money(minPrice)}</p></a>`;
+    <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">From ${money(fromPrice)}</p></a>`;
 }
 function collectionCovers(){
   // Match each collection to a different print (a proper matching, so a
@@ -650,7 +651,7 @@ function home(){
 
 function shop(filter){
   const list = filter?PRINTS.filter(p=>p.collections.includes(filter)):PRINTS;
-  return `<div class="wrap"><div class="phead"><h1>All prints</h1><p>Every photograph is available in three sizes, as a print alone or framed in black or natural oak.</p></div>
+  return `<div class="wrap"><div class="phead"><h1>All prints</h1><p>Every photograph is available in three sizes, as a canvas print alone or as a gallery wrapped canvas.</p></div>
   <div class="filters" role="group" aria-label="Filter by collection">
     <button class="chip" data-f="" aria-pressed="${!filter}">All</button>
     ${COLLECTIONS.map(c=>`<button class="chip" data-f="${c.slug}" aria-pressed="${filter===c.slug}">${esc(c.name)}</button>`).join("")}
@@ -688,7 +689,7 @@ function product(slug){
     <div class="pinfo">
       <h1>${esc(p.title)}</h1>
       ${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}
-      <p class="amount" id="amount">${money(minPrice)}</p>
+      <p class="amount" id="amount">${money(fromPrice)}</p>
       <p class="desc">${esc(p.desc)}</p>
       <form id="buy">
         <fieldset><legend>Print size <em id="sizeLbl">Select</em></legend><div class="opts">
@@ -834,7 +835,7 @@ function bind(page,arg){
     f.addEventListener("input",e=>{const t=e.target;if(t!==f.cl&&t!==f.cw)return;
       const o=t===f.cl?f.cw:f.cl, v=parseFloat(t.value);
       o.value=v>0?r1(t===f.cl?v/ratio:v*ratio):""});
-    const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return (s&&!s.custom?s.price:minPrice)+(fi?fi.price:0)};
+    const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return (s&&!s.custom?s.price:minPrice)+(fi?fi.price:minFinish)};
     const upd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
       $("#customDims").hidden=!cu;$("#amount").hidden=cu;$("#amount").textContent=money(price()*qty);$("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
