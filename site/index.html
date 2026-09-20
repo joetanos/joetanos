@@ -823,6 +823,12 @@ function bind(page,arg){
     const sel=()=>SZ.find(x=>x.id===f.size.value);
     const dims=()=>{const l=+f.cl.value,w=+f.cw.value;return l>0&&w>0?`${l} × ${w} cm`:""};
     const sizeText=s=>!s?"":s.custom?(dims()?`Custom, ${dims()}`:"Custom"):s.label;
+    // keep custom length × width in the same proportion as the print's standard sizes
+    const ratio=(()=>{const m=(SZ[0].label||"").match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/i);return m&&+m[2]?+m[1]/+m[2]:2/3})();
+    const r1=n=>Math.round(n*10)/10;
+    f.addEventListener("input",e=>{const t=e.target;if(t!==f.cl&&t!==f.cw)return;
+      const o=t===f.cl?f.cw:f.cl, v=parseFloat(t.value);
+      o.value=v>0?r1(t===f.cl?v/ratio:v*ratio):""});
     const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return (s&&!s.custom?s.price:minPrice)+(fi?fi.price:0)};
     const upd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
       $("#customDims").hidden=!cu;$("#amount").hidden=cu;$("#amount").textContent=money(price()*qty);$("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";$("#hint").textContent=""};
