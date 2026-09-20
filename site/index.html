@@ -543,8 +543,11 @@ let cart = store("jt-cart") || [];
 function saveCart(){store("jt-cart",cart)}
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2400)}
 
+const CARD_COVER={eiffel:1}; // which photo (0-based) the grid card shows; the print page keeps its own order
 function card(p){
-  const im = printImages(p);
+  const all = printImages(p);
+  const ci = Math.min(CARD_COVER[p.slug]||0, all.length-1);
+  const im = [all[ci], ...all.filter((_,i)=>i!==ci)];
   return `<a class="pcard" href="#/print/${p.slug}">
     <div class="ph"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy">${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy">`:""}</div>
     <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">From ${money(minPrice)}</p></a>`;
@@ -612,8 +615,7 @@ function home(){
   </section>
   <section class="block"><div class="wrap">
     <div class="rule sec-head"><h2>Currently on the wall</h2></div>
-    <div class="grid4">${PRINTS.slice(0,4).map(card).join("")}</div>
-    <div class="more"><a class="small-link" href="#/shop">See all prints ${ARROW}</a></div>
+    <div class="grid4">${PRINTS.map(card).join("")}</div>
   </div></section>
   <section class="band"><div class="wrap">
     <div class="sec-head"><h2>Collections</h2><p>Work grouped by what it looks at.</p></div>
