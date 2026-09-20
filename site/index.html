@@ -184,6 +184,19 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .opts input{position:absolute;opacity:0}
 .opts span{display:block;border:1px solid var(--line);padding:9px 14px;font-family:var(--sans);font-size:12.5px;cursor:pointer}
 .opts input:checked+span{border-color:var(--ink);background:var(--ink);color:var(--bg)}
+/* raised, 3D-style controls on the print page */
+.pinfo .opts span,.pinfo .qty,.pinfo .btn.wa,.pinfo .btn.share{
+  border-radius:5px;background-image:linear-gradient(rgba(255,255,255,.14),rgba(0,0,0,.14));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 3px 0 rgba(0,0,0,.4),0 8px 14px -4px rgba(0,0,0,.45);
+  transition:transform .12s ease,box-shadow .12s ease,opacity .2s}
+.pinfo .qty{overflow:hidden}
+.pinfo .opts span:hover,.pinfo .btn.wa:hover,.pinfo .btn.share:hover{transform:translateY(-2px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.32),0 5px 0 rgba(0,0,0,.4),0 12px 18px -4px rgba(0,0,0,.5);opacity:1}
+.pinfo .opts label:active span,.pinfo .btn.wa:active,.pinfo .btn.share:active{transform:translateY(2px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 1px 0 rgba(0,0,0,.4),0 2px 4px -2px rgba(0,0,0,.4)}
+.pinfo .opts input:checked+span{box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 4px 0 rgba(0,0,0,.45),0 10px 16px -4px rgba(0,0,0,.5)}
+.pinfo .qty button{transition:background .15s}
+.pinfo .qty button:active{background:rgba(255,255,255,.08)}
 .opts input:focus-visible+span{outline:2px solid var(--ink);outline-offset:2px}
 .custom-dims{display:flex;align-items:flex-end;gap:10px;margin-top:12px;font-family:var(--sans);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 .custom-dims[hidden]{display:none}
