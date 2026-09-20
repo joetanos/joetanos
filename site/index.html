@@ -198,6 +198,7 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .buyrow .btn{flex:1;padding:15px}
 .btn.wa{display:flex;align-items:center;justify-content:center;gap:10px}
 .btn.wa svg{width:17px;height:17px;flex-shrink:0}
+.btn.ig{padding:15px;margin-bottom:10px}
 .btn.share{display:inline-flex;align-items:center;gap:10px;margin:0 0 26px;cursor:pointer}
 .btn.share svg{width:16px;height:16px}
 .pnav{display:flex;justify-content:space-between;gap:16px;margin:-40px 0 56px}
@@ -287,7 +288,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
         <a href="#/" class="logo" aria-label="Joe Tanos, home" id="logo2" style="margin-bottom:14px"></a>
         <p style="max-width:260px;margin-bottom:22px">Limited-edition photographic prints, made and shipped from Beirut.</p>
         <h4>Reach the studio</h4>
-        <ul><li><a href="mailto:hello@example.com">hello@example.com</a></li><li><a href="#" data-wa>WhatsApp</a></li></ul>
+        <ul><li><a href="mailto:hello@example.com">hello@example.com</a></li><li><a href="#" data-wa>WhatsApp</a></li><li><a href="#" data-ig>Instagram</a></li></ul>
       </div>
       <div><h4>Shop</h4><ul><li><a href="#/shop">All prints</a></li><li><a href="#/collections">Collections</a></li></ul></div>
       <div><h4>Studio</h4><ul><li><a href="#/about">About</a></li><li><a href="#/contact">Contact</a></li></ul></div>
@@ -359,6 +360,9 @@ const CATALOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqN9mnutNq
    Your number in international format, digits only (no +, spaces or leading 00).
    Example for Lebanon: 961 + number without the leading 0 → "96171123456" */
 const WHATSAPP_NUMBER = "96181874716";
+const INSTAGRAM_HANDLE = ""; // set this to the account name, e.g. "joetanos"; while empty the buttons open instagram.com
+const igLink = ()=>"https://www.instagram.com/"+INSTAGRAM_HANDLE.replace(/^@/,"");
+const IG_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg>';
 function waLink(text){return "https://wa.me/"+WHATSAPP_NUMBER+(text?"?text="+encodeURIComponent(text):"")}
 
 /* ---------- Pricing ---------- */
@@ -703,6 +707,7 @@ function product(slug){
           <div class="qty"><button type="button" data-q="-1" aria-label="Decrease quantity">−</button><output id="qty">1</output><button type="button" data-q="1" aria-label="Increase quantity">+</button></div>
           <a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2Z"/></svg>Contact on WhatsApp</a>
         </div>
+        <a class="btn ghost wa ig" data-ig href="#" target="_blank" rel="noopener">${IG_ICON}Contact on Instagram</a>
         <p class="hint" id="hint"></p>
       </form>
       <button type="button" class="btn ghost share" id="shareBtn" data-title="${esc(p.title)}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Share this print</button>
@@ -742,7 +747,7 @@ function contact(){
     <label>About<select name="topic"><option>A print or order</option><option>Custom size</option><option>Commission</option><option>Something else</option></select></label>
     <label>Message<textarea name="message" required></textarea></label>
     <div><button class="btn" type="submit">Send message</button></div>
-    <p style="color:var(--muted);font-size:14px">Or write to <a href="mailto:hello@example.com" style="text-decoration:underline">hello@example.com</a>, or message the studio on <a href="#" data-wa style="text-decoration:underline">WhatsApp</a>.</p>
+    <p style="color:var(--muted);font-size:14px">Or write to <a href="mailto:hello@example.com" style="text-decoration:underline">hello@example.com</a>, or message the studio on <a href="#" data-wa style="text-decoration:underline">WhatsApp</a> or <a href="#" data-ig style="text-decoration:underline">Instagram</a>.</p>
   </form></div>`;
 }
 
@@ -779,6 +784,7 @@ function route(){
   document.querySelectorAll("nav.main a").forEach(a=>{const h=a.getAttribute("href").slice(2);a.toggleAttribute("aria-current",page===h||(h==="shop"&&page==="print")||(h==="collections"&&page==="collection"));if(a.hasAttribute("aria-current"))a.setAttribute("aria-current","page")});
   $("#nav").classList.remove("open");$(".menu-btn").setAttribute("aria-expanded","false");
   document.querySelectorAll("#main [data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
+  document.querySelectorAll("#main [data-ig]").forEach(a=>{a.href=igLink();a.target="_blank";a.rel="noopener"});
   bind(page,arg);
 }
 
@@ -871,6 +877,7 @@ function bind(page,arg){
 /* ---------- Boot ---------- */
 function logoHTML(){return IMAGES.logo?`<img src="${IMAGES.logo}" alt="Joe Tanos">`:"Joe Tanos"}
 document.querySelectorAll("[data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
+document.querySelectorAll("[data-ig]").forEach(a=>{a.href=igLink();a.target="_blank";a.rel="noopener"});
 $("#logo").innerHTML=logoHTML(); $("#logo2").innerHTML=logoHTML();
 $(".menu-btn").onclick=e=>{const o=$("#nav").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",o)};
 if(!store("jt-cookie")) $("#cookie").hidden=false;
