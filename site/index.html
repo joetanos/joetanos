@@ -550,6 +550,8 @@ const findSize = id=>[SIZES,...PRINTS.map(p=>p.sizes||[])].flat().find(s=>s.id==
 // Final prices by size position (small, medium, large) and finish. Applies to every print, whatever sizes the sheet lists.
 const PRICE_TABLE = [{print:20,oak:40},{print:30,oak:55},{print:60,oak:80}];
 const priceOf = (sizeIdx,finId)=>(PRICE_TABLE[sizeIdx]||PRICE_TABLE[PRICE_TABLE.length-1])[finId];
+const DEFAULT_SIZE = 1, DEFAULT_FINISH = "oak"; // preselected on every print page: 50 × 75 cm, gallery wrapped
+const defSize = p=>Math.min(DEFAULT_SIZE,sizesFor(p).length-1);
 const fromPrice = Math.min(...PRICE_TABLE.flatMap(r=>Object.values(r)));
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
 let cart = store("jt-cart") || [];
@@ -690,14 +692,14 @@ function product(slug){
     <div class="pinfo">
       <h1>${esc(p.title)}</h1>
       ${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}
-      <p class="amount" id="amount">${money(fromPrice)}</p>
+      <p class="amount" id="amount">${money(priceOf(defSize(p),DEFAULT_FINISH))}</p>
       <p class="desc">${esc(p.desc)}</p>
       <form id="buy">
         <fieldset><legend>Print size <em id="sizeLbl">Select</em></legend><div class="opts">
-          ${sizeOptions(p).map(s=>`<label><input type="radio" name="size" value="${s.id}"><span>${s.label}</span></label>`).join("")}</div>
+          ${sizeOptions(p).map((s,i)=>`<label><input type="radio" name="size" value="${s.id}"${i===defSize(p)?" checked":""}><span>${s.label}</span></label>`).join("")}</div>
           <div class="custom-dims" id="customDims" hidden><label>Length (cm)<input type="number" name="cl" min="1" max="500" step="any" inputmode="decimal"></label><span class="x" aria-hidden="true">×</span><label>Width (cm)<input type="number" name="cw" min="1" max="500" step="any" inputmode="decimal"></label></div></fieldset>
         <fieldset><legend>Finish <em id="finLbl">Select</em></legend><div class="opts">
-          ${FINISHES.map(f=>`<label><input type="radio" name="finish" value="${f.id}"><span>${f.label}</span></label>`).join("")}</div></fieldset>
+          ${FINISHES.map(f=>`<label><input type="radio" name="finish" value="${f.id}"${f.id===DEFAULT_FINISH?" checked":""}><span>${f.label}</span></label>`).join("")}</div></fieldset>
         <div class="buyrow">
           <div class="qty"><button type="button" data-q="-1" aria-label="Decrease quantity">−</button><output id="qty">1</output><button type="button" data-q="1" aria-label="Increase quantity">+</button></div>
           <a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2Z"/></svg>Contact on WhatsApp</a>
@@ -850,7 +852,7 @@ function bind(page,arg){
     f.addEventListener("change",waUpd);f.addEventListener("input",waUpd);
     f.querySelectorAll("[data-q]").forEach(b=>b.addEventListener("click",waUpd));
     f.onsubmit=e=>e.preventDefault();
-    waUpd();
+    upd();waUpd();
   }
   if(page==="cart"){
     document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.rm,1);saveCart();route()});
