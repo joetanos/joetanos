@@ -549,8 +549,8 @@ const sizeOptions = p=>[...sizesFor(p),CUSTOM];
 const findSize = id=>[SIZES,...PRINTS.map(p=>p.sizes||[])].flat().find(s=>s.id===id);
 const minPrice = Math.min(...SIZES.map(s=>s.price));
 const minFinish = Math.min(...FINISHES.map(f=>f.price));
-// Every price is (size + finish) scaled so the smallest size on gallery wrapped canvas is $50; everything else stays in proportion.
-const PRICE_K = 50/(SIZES[0].price+FINISHES.find(f=>f.id==="oak").price);
+// Every price is (size + finish) scaled so the middle size (50 × 75) on gallery wrapped canvas is $50; everything else stays in proportion.
+const PRICE_K = 50/(SIZES[1].price+FINISHES.find(f=>f.id==="oak").price);
 const priceOf = (size,fin)=>Math.round((size+fin)*PRICE_K);
 const fromPrice = priceOf(minPrice,minFinish);
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
