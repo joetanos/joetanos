@@ -199,6 +199,11 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .btn.wa{display:flex;align-items:center;justify-content:center;gap:10px}
 .btn.wa svg{width:17px;height:17px;flex-shrink:0}
 .btn.ig{padding:15px;margin-bottom:10px}
+.ico-links{display:flex;align-items:center;gap:18px}
+.ico-links a{display:inline-flex;color:var(--muted)}
+.ico-links a:hover{color:var(--ink)}
+.ico-links svg{width:22px;height:22px}
+.ico-row{display:flex;flex-direction:column;gap:12px}
 .btn.share{display:inline-flex;align-items:center;gap:10px;margin:0 0 26px;cursor:pointer}
 .btn.share svg{width:16px;height:16px}
 .pnav{display:flex;justify-content:space-between;gap:16px;margin:-40px 0 56px}
@@ -288,7 +293,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
         <a href="#/" class="logo" aria-label="Joe Tanos, home" id="logo2" style="margin-bottom:14px"></a>
         <p style="max-width:260px;margin-bottom:22px">Limited-edition photographic prints, made and shipped from Beirut.</p>
         <h4>Reach the studio</h4>
-        <ul><li><a href="mailto:hello@example.com">hello@example.com</a></li><li><a href="#" data-wa>WhatsApp</a></li><li><a href="#" data-ig>Instagram</a></li></ul>
+        <div class="ico-links" id="footIcons"></div>
       </div>
       <div><h4>Shop</h4><ul><li><a href="#/shop">All prints</a></li><li><a href="#/collections">Collections</a></li></ul></div>
       <div><h4>Studio</h4><ul><li><a href="#/about">About</a></li><li><a href="#/contact">Contact</a></li></ul></div>
@@ -363,6 +368,9 @@ const WHATSAPP_NUMBER = "96181874716";
 const INSTAGRAM_HANDLE = "justriggered"; // change this to rename the Instagram account the buttons open
 const igLink = ()=>"https://www.instagram.com/"+INSTAGRAM_HANDLE.replace(/^@/,"");
 const IG_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg>';
+const WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2Z"/></svg>';
+const MAIL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6.5L20.5 7"/></svg>';
+const contactIcons = ()=>`<a href="mailto:hello@example.com" aria-label="Email" title="Email">${MAIL_ICON}</a><a href="#" data-wa aria-label="WhatsApp" title="WhatsApp">${WA_ICON}</a><a href="#" data-ig aria-label="Instagram" title="Instagram">${IG_ICON}</a>`;
 function waLink(text){return "https://wa.me/"+WHATSAPP_NUMBER+(text?"?text="+encodeURIComponent(text):"")}
 
 /* ---------- Pricing ---------- */
@@ -747,7 +755,7 @@ function contact(){
     <label>About<select name="topic"><option>A print or order</option><option>Custom size</option><option>Commission</option><option>Something else</option></select></label>
     <label>Message<textarea name="message" required></textarea></label>
     <div><button class="btn" type="submit">Send message</button></div>
-    <p style="color:var(--muted);font-size:14px">Or write to <a href="mailto:hello@example.com" style="text-decoration:underline">hello@example.com</a>, or message the studio on <a href="#" data-wa style="text-decoration:underline">WhatsApp</a> or <a href="#" data-ig style="text-decoration:underline">Instagram</a>.</p>
+    <div class="ico-row"><p style="color:var(--muted);font-size:14px">Or reach the studio directly</p><div class="ico-links">${contactIcons()}</div></div>
   </form></div>`;
 }
 
@@ -876,6 +884,7 @@ function bind(page,arg){
 
 /* ---------- Boot ---------- */
 function logoHTML(){return IMAGES.logo?`<img src="${IMAGES.logo}" alt="Joe Tanos">`:"Joe Tanos"}
+$("#footIcons").innerHTML=contactIcons();
 document.querySelectorAll("[data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
 document.querySelectorAll("[data-ig]").forEach(a=>{a.href=igLink();a.target="_blank";a.rel="noopener"});
 $("#logo").innerHTML=logoHTML(); $("#logo2").innerHTML=logoHTML();
