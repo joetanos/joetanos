@@ -547,12 +547,10 @@ const CUSTOM = {id:"custom", label:"Custom", custom:true};
 const sizesFor = p=>(p&&p.sizes)||SIZES;
 const sizeOptions = p=>[...sizesFor(p),CUSTOM];
 const findSize = id=>[SIZES,...PRINTS.map(p=>p.sizes||[])].flat().find(s=>s.id===id);
-const minPrice = Math.min(...SIZES.map(s=>s.price));
-const minFinish = Math.min(...FINISHES.map(f=>f.price));
-// Every price is (size + finish) scaled so the middle size (50 × 75) on gallery wrapped canvas is $50; everything else stays in proportion.
-const PRICE_K = 50/(SIZES[1].price+FINISHES.find(f=>f.id==="oak").price);
-const priceOf = (size,fin)=>Math.round((size+fin)*PRICE_K);
-const fromPrice = priceOf(minPrice,minFinish);
+// Final prices by size position (small, medium, large) and finish. Applies to every print, whatever sizes the sheet lists.
+const PRICE_TABLE = [{print:25,oak:35},{print:38,oak:50},{print:60,oak:75}];
+const priceOf = (sizeIdx,finId)=>(PRICE_TABLE[sizeIdx]||PRICE_TABLE[PRICE_TABLE.length-1])[finId];
+const fromPrice = Math.min(...PRICE_TABLE.flatMap(r=>Object.values(r)));
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
 let cart = store("jt-cart") || [];
 function saveCart(){store("jt-cart",cart)}
@@ -838,7 +836,7 @@ function bind(page,arg){
     f.addEventListener("input",e=>{const t=e.target;if(t!==f.cl&&t!==f.cw)return;
       const o=t===f.cl?f.cw:f.cl, v=parseFloat(t.value);
       o.value=v>0?r1(t===f.cl?v/ratio:v*ratio):""});
-    const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return priceOf(s&&!s.custom?s.price:minPrice, fi?fi.price:minFinish)};
+    const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return priceOf(s&&!s.custom?Math.max(0,SZ.indexOf(s)):0, fi?fi.id:"print")};
     const upd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
       $("#customDims").hidden=!cu;$("#amount").hidden=cu;$("#amount").textContent=money(price()*qty);$("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
