@@ -552,7 +552,6 @@ const PRICE_TABLE = [{print:20,oak:40},{print:30,oak:55},{print:60,oak:80}];
 const priceOf = (sizeIdx,finId)=>(PRICE_TABLE[sizeIdx]||PRICE_TABLE[PRICE_TABLE.length-1])[finId];
 const DEFAULT_SIZE = 1, DEFAULT_FINISH = "oak"; // preselected on every print page: 50 × 75 cm, gallery wrapped
 const defSize = p=>Math.min(DEFAULT_SIZE,sizesFor(p).length-1);
-const fromPrice = Math.min(...PRICE_TABLE.flatMap(r=>Object.values(r)));
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
 let cart = store("jt-cart") || [];
 function saveCart(){store("jt-cart",cart)}
@@ -567,7 +566,7 @@ function card(p){
   const fit = p.slug in CARD_COVER ? 'onload="cardFit(this)"' : ""; // show the whole tall photo instead of cropping it
   return `<a class="pcard" href="#/print/${p.slug}">
     <div class="ph" style="--bg:url('${im[0].src}')"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy" ${fit}>${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy" ${fit}>`:""}</div>
-    <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">From ${money(fromPrice)}</p></a>`;
+    <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">${money(priceOf(defSize(p),DEFAULT_FINISH))}</p></a>`;
 }
 function collectionCovers(){
   // Match each collection to a different print (a proper matching, so a
