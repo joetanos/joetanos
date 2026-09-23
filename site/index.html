@@ -569,7 +569,7 @@ function saveCart(){store("jt-cart",cart)}
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2400)}
 
 function cardFit(im){if(im.naturalHeight>im.naturalWidth*1.05){im.classList.add("pt");if(!im.classList.contains("alt"))im.parentNode.classList.add("portrait")}}
-const CARD_COVER={eiffel:1}; // which photo (0-based) the grid card shows; the print page keeps its own order
+const CARD_COVER={}; // which photo (0-based) the grid card shows; the print page keeps its own order
 function card(p){
   const all = printImages(p);
   const ci = Math.min(CARD_COVER[p.slug]||0, all.length-1);
