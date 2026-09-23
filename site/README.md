@@ -1,4 +1,4 @@
-# Joe Tanos — website
+# Just Framed — website
 
 A static website: `index.html` plus the `images/` folder. No database or build
 step is needed, so it runs on almost any host.

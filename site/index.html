@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Joe Tanos — Photographs taken on location, printed in small editions.</title>
+<title>Just Framed — Photographs taken on location, printed in small editions.</title>
 <link rel="icon" href="images/favicon.png">
-<meta property="og:title" content="Joe Tanos — Photographs taken on location">
+<meta property="og:title" content="Just Framed — Photographs taken on location">
 <meta property="og:description" content="Limited-edition photographic prints of real places.">
 <meta property="og:image" content="images/bekaa-1.jpg">
 <meta name="description" content="Limited-edition photographic prints of real places. Photographed on location and printed on archival cotton paper.">
@@ -272,7 +272,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
 <a class="skip" href="#main">Skip to content</a>
 <header class="site">
   <div class="wrap">
-    <a href="#/" class="logo" aria-label="Joe Tanos, home" id="logo"></a>
+    <a href="#/" class="logo" aria-label="Just Framed, home" id="logo"></a>
     <button class="menu-btn" aria-expanded="false" aria-controls="nav">Menu</button>
     <nav class="main" id="nav" aria-label="Main">
       <a href="#/shop">Prints</a>
@@ -289,7 +289,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
   <div class="wrap">
     <div class="cols">
       <div>
-        <a href="#/" class="logo" aria-label="Joe Tanos, home" id="logo2" style="margin-bottom:14px"></a>
+        <a href="#/" class="logo" aria-label="Just Framed, home" id="logo2" style="margin-bottom:14px"></a>
         <p style="max-width:260px;margin-bottom:22px">Limited-edition photographic prints, made and shipped from Beirut.</p>
         <h4>Reach the studio</h4>
         <div class="ico-links" id="footIcons"></div>
@@ -297,7 +297,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
       <div><h4>Shop</h4><ul><li><a href="#/shop">All prints</a></li><li><a href="#/collections">Collections</a></li></ul></div>
       <div><h4>Studio</h4><ul><li><a href="#/about">About</a></li><li><a href="#/contact">Contact</a></li></ul></div>
     </div>
-    <div class="legal"><span>© 2026 Joe Tanos</span><span>All photographs © Joe Tanos. Reproduction without permission is not permitted.</span></div>
+    <div class="legal"><span>© 2026 Just Framed</span><span>All photographs © Just Framed. Reproduction without permission is not permitted.</span></div>
   </div>
 </footer>
 
@@ -776,15 +776,15 @@ function route(){
   clearInterval(heroTimer);
   const parts = (location.hash.replace(/^#\/?/,"")||"").split("/");
   const [page, arg] = parts;
-  let html, title="Joe Tanos — Photographs taken on location, printed in small editions.";
+  let html, title="Just Framed — Photographs taken on location, printed in small editions.";
   if(page===""){html=home()}
-  else if(page==="shop"){html=shop(arg);title="All prints — Joe Tanos"}
-  else if(page==="collections"){html=collections();title="Collections — Joe Tanos"}
-  else if(page==="collection"){html=collection(arg);const c=COLLECTIONS.find(x=>x.slug===arg);if(c)title=c.name+" — Joe Tanos"}
-  else if(page==="print"){html=product(arg);const p=PRINTS.find(x=>x.slug===arg);if(p)title=`${p.title} — Joe Tanos`}
-  else if(page==="about"){html=about();title="About — Joe Tanos"}
-  else if(page==="contact"){html=contact();title="Contact — Joe Tanos"}
-  else if(page==="cart"){html=cartPage();title="Cart — Joe Tanos"}
+  else if(page==="shop"){html=shop(arg);title="All prints — Just Framed"}
+  else if(page==="collections"){html=collections();title="Collections — Just Framed"}
+  else if(page==="collection"){html=collection(arg);const c=COLLECTIONS.find(x=>x.slug===arg);if(c)title=c.name+" — Just Framed"}
+  else if(page==="print"){html=product(arg);const p=PRINTS.find(x=>x.slug===arg);if(p)title=`${p.title} — Just Framed`}
+  else if(page==="about"){html=about();title="About — Just Framed"}
+  else if(page==="contact"){html=contact();title="Contact — Just Framed"}
+  else if(page==="cart"){html=cartPage();title="Cart — Just Framed"}
   else html=notFound();
   $("#main").innerHTML=html; document.title=title; window.scrollTo(0,0);
   document.querySelectorAll("nav.main a").forEach(a=>{const h=a.getAttribute("href").slice(2);a.toggleAttribute("aria-current",page===h||(h==="shop"&&page==="print")||(h==="collections"&&page==="collection"));if(a.hasAttribute("aria-current"))a.setAttribute("aria-current","page")});
@@ -823,7 +823,7 @@ function bind(page,arg){
   if(page==="print"){
     const sb=$("#shareBtn");
     if(sb) sb.onclick=async()=>{
-      const data={title:sb.dataset.title+" – Joe Tanos",url:location.href};
+      const data={title:sb.dataset.title+" – Just Framed",url:location.href};
       try{ if(navigator.share){await navigator.share(data);return} }catch(e){ if(e&&e.name==="AbortError") return }
       try{ await navigator.clipboard.writeText(data.url); toast("Link copied") }
       catch(e){ prompt("Copy this link:",data.url) }
@@ -881,7 +881,7 @@ function bind(page,arg){
 }
 
 /* ---------- Boot ---------- */
-function logoHTML(){return IMAGES.logo?`<img src="${IMAGES.logo}" alt="Joe Tanos">`:"Joe Tanos"}
+function logoHTML(){return IMAGES.logo?`<img src="${IMAGES.logo}" alt="Just Framed">`:"Just Framed"}
 $("#footIcons").innerHTML=contactIcons();
 document.querySelectorAll("[data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
 document.querySelectorAll("[data-ig]").forEach(a=>{a.href=igLink();a.target="_blank";a.rel="noopener"});
