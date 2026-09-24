@@ -625,7 +625,16 @@ const PROCESS = `<section class="process"><div class="wrap"><h2>How prints are m
 const ARROW = `<span aria-hidden="true">→</span>`;
 
 /* ---------- Pages ---------- */
-function heroSlides(){return PRINTS.filter(hasPhotos)}
+// Every print, in a random order that's shuffled once per visit (and again if the catalog reloads)
+let heroOrder=null, heroFrom=null;
+function heroSlides(){
+  if(heroFrom!==PRINTS){
+    heroOrder=PRINTS.filter(hasPhotos);
+    for(let i=heroOrder.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[heroOrder[i],heroOrder[j]]=[heroOrder[j],heroOrder[i]]}
+    heroFrom=PRINTS;
+  }
+  return heroOrder;
+}
 function heroCaption(p){return esc(p.title.replace(/\.$/,""))+(whereText(p)?" – "+esc(whereText(p)):"")}
 let heroTimer=null;
 function home(){
@@ -808,7 +817,7 @@ function bind(page,arg){
     const show=n=>{i=(n+slides.length)%slides.length;load(i);load(i+1);
       slides.forEach((sl,k)=>{sl.classList.toggle("on",k===i);sl.setAttribute("aria-hidden",k!==i);sl.tabIndex=k===i?0:-1});
       cap.style.opacity=0;setTimeout(()=>{cap.innerHTML=heroCaption(list[i]);cap.style.opacity=1},200)};
-    const start=()=>{clearInterval(heroTimer);if(slides.length>1)heroTimer=setInterval(()=>show(i+1),5000)};
+    const start=()=>{clearInterval(heroTimer);if(slides.length>1)heroTimer=setInterval(()=>show(i+1),4000)};
     const stage=$(".hero-stage");
     stage.addEventListener("mouseenter",()=>clearInterval(heroTimer));
     stage.addEventListener("mouseleave",start);
