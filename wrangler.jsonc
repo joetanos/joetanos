@@ -1,7 +1,9 @@
 {
   "name": "joetanos",
   "compatibility_date": "2026-09-01",
+  "main": "./site/worker.js",
   "assets": {
-    "directory": "./site"
+    "directory": "./site",
+    "binding": "ASSETS"
   }
 }

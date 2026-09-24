@@ -716,7 +716,7 @@ function product(slug){
         </div>
         <p class="hint" id="hint"></p>
       </form>
-      <button type="button" class="btn ghost share" id="shareBtn" data-title="${esc(p.title)}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Share this print</button>
+      <button type="button" class="btn ghost share" id="shareBtn" data-title="${esc(p.title)}" data-slug="${esc(p.slug)}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Share this print</button>
       <dl class="specs">
         ${p.coords?`<div><dt>Coordinates</dt><dd>${esc(p.coords)}</dd></div>`:""}
         <div><dt>Availability</dt><dd>Made to order</dd></div>
@@ -823,7 +823,7 @@ function bind(page,arg){
   if(page==="print"){
     const sb=$("#shareBtn");
     if(sb) sb.onclick=async()=>{
-      const data={title:sb.dataset.title+" – Just Framed",url:location.href};
+      const data={title:sb.dataset.title+" – Just Framed",url:location.origin+"/p/"+encodeURIComponent(sb.dataset.slug)};
       try{ if(navigator.share){await navigator.share(data);return} }catch(e){ if(e&&e.name==="AbortError") return }
       try{ await navigator.clipboard.writeText(data.url); toast("Link copied") }
       catch(e){ prompt("Copy this link:",data.url) }
