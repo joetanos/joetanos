@@ -27,10 +27,18 @@
     --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F;
   }
 }
-/* logo.png is faint grey; turn it solid black (light) or white (dark). The drop-shadows thicken its thin, semi-transparent strokes */
-.logo img{filter:brightness(0) drop-shadow(0 0 0 #000) drop-shadow(0 0 0 #000)}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo img{filter:brightness(0) invert(1) drop-shadow(0 0 0 #fff) drop-shadow(0 0 0 #fff)}}
-:root[data-theme="dark"] .logo img{filter:brightness(0) invert(1) drop-shadow(0 0 0 #fff) drop-shadow(0 0 0 #fff)}
+/* logo.png is faint grey. It's drawn twice, split along a slanted line past the lens:
+   the lens keeps its grey look, the lettering turns solid black (light) or white (dark).
+   The drop-shadows thicken the lettering's thin, semi-transparent strokes */
+.logo-art{position:relative;display:inline-flex}
+.logo img.logo-lens{position:absolute;left:0;top:0;clip-path:polygon(0 0,24.5% 0,24.5% 61.8%,18.6% 77.3%,0 77.3%);filter:invert(1) brightness(.45)}
+.logo img.logo-text{clip-path:polygon(24.5% 0,100% 0,100% 100%,0 100%,0 77.3%,18.6% 77.3%,24.5% 61.8%);filter:brightness(0) drop-shadow(0 0 0 #000) drop-shadow(0 0 0 #000)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .logo img.logo-lens{filter:none}
+  :root:not([data-theme="light"]) .logo img.logo-text{filter:brightness(0) invert(1) drop-shadow(0 0 0 #fff) drop-shadow(0 0 0 #fff)}
+}
+:root[data-theme="dark"] .logo img.logo-lens{filter:none}
+:root[data-theme="dark"] .logo img.logo-text{filter:brightness(0) invert(1) drop-shadow(0 0 0 #fff) drop-shadow(0 0 0 #fff)}
 :root[data-theme="dark"]{
   --bg:#16150F; --bg-alt:#1C1B17; --ink:#ECE8E0; --muted:#9C968B; --line:#34322C;
   --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F;
@@ -882,7 +890,7 @@ function bind(page,arg){
 }
 
 /* ---------- Boot ---------- */
-function logoHTML(){return IMAGES.logo?`<img src="${IMAGES.logo}" alt="Just Framed">`:"Just Framed"}
+function logoHTML(){return IMAGES.logo?`<span class="logo-art"><img class="logo-text" src="${IMAGES.logo}" alt="Just Framed"><img class="logo-lens" src="${IMAGES.logo}" alt=""></span>`:"Just Framed"}
 $("#footIcons").innerHTML=contactIcons();
 document.querySelectorAll("[data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
 document.querySelectorAll("[data-ig]").forEach(a=>{a.href=igLink();a.target="_blank";a.rel="noopener"});
