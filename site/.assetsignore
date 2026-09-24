@@ -9,3 +9,5 @@ bun.lock
 bun.lockb
 package-lock.json
 worker.js
+.wrangler
+**/.wrangler
