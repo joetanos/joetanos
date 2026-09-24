@@ -180,6 +180,20 @@ footer a:hover{color:var(--ink)}
 .thumbs button{aspect-ratio:1;opacity:.55;border:1px solid transparent;padding:0}
 .thumbs button[aria-current="true"]{opacity:1;border-color:var(--ink)}
 .thumbs .ph{width:100%;height:100%}
+.gallery .stage .ph img{cursor:zoom-in}
+/* Photo viewer (tap a print photo) */
+.lb{position:fixed;inset:0;z-index:90;transition:opacity .2s;outline:none;background:rgba(12,12,10,.96);touch-action:none;user-select:none;-webkit-user-select:none;overflow:hidden}
+.lb-img{position:absolute;left:50%;top:50%;max-width:calc(100vw - 32px);max-height:calc(100vh - 110px);max-height:calc(100dvh - 110px);transform:translate(-50%,-50%);cursor:zoom-in;will-change:transform}
+.lb-img.zoomed{cursor:grab}
+.lb-img.anim{transition:transform .25s ease}
+.lb-x{position:absolute;top:14px;right:14px;width:44px;height:44px;display:grid;place-items:center;color:#fff;background:rgba(0,0,0,.35);border-radius:50%;z-index:2}
+.lb-x svg{width:18px;height:18px}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:72px;color:#fff;display:grid;place-items:center;opacity:.8;z-index:2}
+.lb-nav:hover{opacity:1}
+.lb-nav svg{width:20px;height:38px}
+.lb-nav.prev{left:8px}.lb-nav.next{right:8px}
+.lb-count{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);color:#fff;font-family:var(--sans);font-size:11px;letter-spacing:.1em;opacity:.8}
+@media (hover:none){.lb-nav{display:none}}
 .pinfo{position:sticky;top:100px}
 .pinfo h1{font-size:clamp(24px,2.4vw,32px);margin-bottom:10px}
 .pinfo .where{font-style:italic;color:var(--muted);font-size:14px;margin-bottom:18px}
@@ -845,6 +859,8 @@ function bind(page,arg){
     g.addEventListener("keydown",e=>{if(e.key==="ArrowLeft")show(+g.dataset.i-1);if(e.key==="ArrowRight")show(+g.dataset.i+1)});
     let x0=null;g.querySelector(".stage").addEventListener("touchstart",e=>x0=e.touches[0].clientX,{passive:true});
     g.querySelector(".stage").addEventListener("touchend",e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>40)show(+g.dataset.i+(dx<0?1:-1));x0=null});
+    g.querySelector(".stage").addEventListener("click",e=>{if(e.target.closest(".gnav"))return;
+      openViewer(slides.map(s=>s.querySelector("img")),+g.dataset.i,show)});
 
     const f=$("#buy"); let qty=1;
     const SZ=sizeOptions(PRINTS.find(x=>x.slug===arg));
@@ -886,6 +902,67 @@ function bind(page,arg){
     $("#contact").onsubmit=e=>{e.preventDefault();const d=new FormData(e.target);
       window.location.href="mailto:hello@example.com?subject="+encodeURIComponent(d.get("topic")+" — "+d.get("name"))+"&body="+encodeURIComponent(d.get("message")+"\n\n"+d.get("name")+"\n"+d.get("email"));};
   }
+}
+
+/* ---------- Photo viewer ----------
+   Full-screen view of a print's photos. Pinch, double-tap, click or scroll to zoom;
+   drag to move around when zoomed; swipe or arrows for the next photo; X or Esc closes. */
+function openViewer(imgs,start,onChange){
+  if(!imgs.length) return;
+  const chev=d=>`<svg viewBox="0 0 22 40" fill="none" stroke="currentColor" stroke-width="2"><path d="${d}"/></svg>`;
+  const lb=document.createElement("div");
+  lb.className="lb"; lb.setAttribute("role","dialog"); lb.setAttribute("aria-modal","true"); lb.setAttribute("aria-label","Photo viewer");
+  lb.innerHTML=`<img class="lb-img" alt="" draggable="false">
+    <button type="button" class="lb-x" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+    ${imgs.length>1?`<button type="button" class="lb-nav prev" aria-label="Previous photo">${chev("M18 3 4 20l14 17")}</button><button type="button" class="lb-nav next" aria-label="Next photo">${chev("M4 3l14 17L4 37")}</button><span class="lb-count"></span>`:""}`;
+  document.body.appendChild(lb);
+  const im=lb.querySelector(".lb-img"), cnt=lb.querySelector(".lb-count"), back=document.activeElement, overflow=document.body.style.overflow;
+  document.body.style.overflow="hidden";
+  let i=start, s=1, tx=0, ty=0;
+  const apply=anim=>{im.classList.toggle("anim",!!anim);im.classList.toggle("zoomed",s>1.01);im.style.transform=`translate(-50%,-50%) translate(${tx}px,${ty}px) scale(${s})`};
+  const clamp=()=>{const mx=Math.max(0,(im.offsetWidth*s-lb.clientWidth)/2), my=Math.max(0,(im.offsetHeight*s-lb.clientHeight)/2);
+    tx=Math.min(mx,Math.max(-mx,tx)); ty=Math.min(my,Math.max(-my,ty))};
+  // Zoom to ns while keeping the screen point (px,py) still
+  const zoomAt=(ns,px,py)=>{ns=Math.min(4,Math.max(1,ns));const cx=lb.clientWidth/2, cy=lb.clientHeight/2, qx=(px-cx-tx)/s, qy=(py-cy-ty)/s;
+    s=ns; tx=px-cx-s*qx; ty=py-cy-s*qy; if(s===1) tx=ty=0; clamp()};
+  const toggle=(x,y)=>{zoomAt(s>1.01?1:2.5,x,y);apply(true)};
+  const onImg=(x,y)=>{const r=im.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom};
+  const go=n=>{i=(n+imgs.length)%imgs.length; s=1; tx=ty=0; im.src=imgs[i].currentSrc||imgs[i].src; im.alt=imgs[i].alt;
+    if(cnt) cnt.textContent=`${i+1} / ${imgs.length}`; apply(); onChange&&onChange(i)};
+  const key=e=>{if(e.key==="Escape")close();else if(e.key==="ArrowLeft")go(i-1);else if(e.key==="ArrowRight")go(i+1)};
+  const resize=()=>{clamp();apply()};
+  let closed=false;
+  // Fade out, but stay in place briefly so the tap that closed it cannot also hit the page underneath
+  const close=()=>{if(closed)return;closed=true;lb.style.opacity=0;setTimeout(()=>lb.remove(),400);document.body.style.overflow=overflow;document.removeEventListener("keydown",key);removeEventListener("resize",resize);removeEventListener("hashchange",close);back&&back.focus&&back.focus()};
+  document.addEventListener("keydown",key); addEventListener("resize",resize); addEventListener("hashchange",close);
+  // pointerup as well as click: a tap right after a swipe can lose its click event on phones
+  const x=lb.querySelector(".lb-x"); x.onclick=close; x.addEventListener("pointerup",close);
+  lb.querySelector(".prev")?.addEventListener("click",()=>go(i-1));
+  lb.querySelector(".next")?.addEventListener("click",()=>go(i+1));
+
+  const pts=new Map(); let down=null, last=null, moved=false, pinched=false, swipeX=0, startDist=0, startS=1, lastTap=0;
+  lb.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;
+    lb.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); im.classList.remove("anim");
+    if(pts.size===1){down=last={x:e.clientX,y:e.clientY};moved=pinched=false;swipeX=0}
+    else if(pts.size===2){const [a,b]=[...pts.values()];startDist=Math.hypot(a.x-b.x,a.y-b.y);startS=s;pinched=true}});
+  lb.addEventListener("pointermove",e=>{if(!pts.has(e.pointerId))return; pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size>=2){const [a,b]=[...pts.values()];zoomAt(startS*Math.hypot(a.x-b.x,a.y-b.y)/startDist,(a.x+b.x)/2,(a.y+b.y)/2);apply();return}
+    const dx=e.clientX-last.x, dy=e.clientY-last.y; last={x:e.clientX,y:e.clientY};
+    if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>8) moved=true;
+    if(s>1.01){tx+=dx;ty+=dy;clamp()} else if(!pinched){swipeX+=dx;tx=swipeX}
+    apply()});
+  const up=e=>{if(!pts.has(e.pointerId))return; pts.delete(e.pointerId);
+    if(pts.size===1){last={...[...pts.values()][0]};return}   // one finger left after a pinch: keep panning
+    if(pts.size) return;
+    if(s<=1.01){s=1;ty=0;
+      if(!pinched&&Math.abs(swipeX)>60&&imgs.length>1) go(i+(swipeX<0?1:-1)); else {tx=0;apply(true)}}
+    if(moved||pinched||e.type==="pointercancel") return;
+    if(!onImg(e.clientX,e.clientY)){if(s>1.01)toggle(e.clientX,e.clientY);return}
+    if(e.pointerType==="mouse") toggle(e.clientX,e.clientY);
+    else {const now=Date.now(); if(now-lastTap<300){toggle(e.clientX,e.clientY);lastTap=0} else lastTap=now}};
+  lb.addEventListener("pointerup",up); lb.addEventListener("pointercancel",up);
+  lb.addEventListener("wheel",e=>{e.preventDefault();zoomAt(s*Math.exp(-e.deltaY*.0015),e.clientX,e.clientY);apply()},{passive:false});
+  lb.tabIndex=-1; go(start); lb.focus();
 }
 
 /* ---------- Boot ---------- */
