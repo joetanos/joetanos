@@ -27,9 +27,10 @@
     --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F;
   }
 }
-.logo img{filter:invert(1) brightness(.45)}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo img{filter:none}}
-:root[data-theme="dark"] .logo img{filter:none}
+/* logo.png is faint grey; turn it solid black (light) or white (dark). The drop-shadows thicken its thin, semi-transparent strokes */
+.logo img{filter:brightness(0) drop-shadow(0 0 0 #000) drop-shadow(0 0 0 #000)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo img{filter:brightness(0) invert(1) drop-shadow(0 0 0 #fff) drop-shadow(0 0 0 #fff)}}
+:root[data-theme="dark"] .logo img{filter:brightness(0) invert(1) drop-shadow(0 0 0 #fff) drop-shadow(0 0 0 #fff)}
 :root[data-theme="dark"]{
   --bg:#16150F; --bg-alt:#1C1B17; --ink:#ECE8E0; --muted:#9C968B; --line:#34322C;
   --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F;
