@@ -642,7 +642,7 @@ function home(){
   return `
   <section class="hero" aria-roledescription="carousel" aria-label="Featured prints">
     <div class="ph hero-stage">
-      ${heroSlides().map((p,i)=>`<a class="hero-slide${i?"":" on"}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${printImages(p)[0].src}" alt=""><span class="pair-wrap"><img class="fit main" ${i?"data-":""}src="${printImages(p)[0].src}" alt="${esc(p.title)}, framed on a wall">${printImages(p)[1]?`<img class="fit second" ${i?"data-":""}src="${printImages(p)[1].src}" alt="${esc(printImages(p)[1].alt)}">`:""}</span></a>`).join("")}
+      ${heroSlides().map((p,i)=>`<a class="hero-slide${i?"":" on"}${printImages(p)[1]?" pair":""}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${printImages(p)[0].src}" alt=""><span class="pair-wrap"><img class="fit main" ${i?"data-":""}src="${printImages(p)[0].src}" alt="${esc(p.title)}, framed on a wall">${printImages(p)[1]?`<img class="fit second" ${i?"data-":""}src="${printImages(p)[1].src}" alt="${esc(printImages(p)[1].alt)}">`:""}</span></a>`).join("")}
     </div>
     <div class="copy">
       <p class="caption" id="heroCap" aria-live="polite">${heroCaption(heroSlides()[0])}</p>
@@ -808,12 +808,9 @@ function bind(page,arg){
   if(page===""){
     const slides=[...document.querySelectorAll(".hero-slide")], list=heroSlides(), cap=$("#heroCap");
     let i=0;
-    const prep=sl=>{const m=sl.querySelector("img.main"), sec=sl.querySelector("img.second");
-      const check=()=>{if(sec&&m.naturalHeight>m.naturalWidth)sl.classList.add("pair")};
-      m.complete&&m.getAttribute("src")?check():m.addEventListener("load",check)};
-    const load=k=>{const sl=slides[(k+slides.length)%slides.length];if(!sl.querySelector("img[data-src]"))return;
-      prep(sl);sl.querySelectorAll("img[data-src]").forEach(im=>{im.src=im.dataset.src;im.removeAttribute("data-src")})};
-    prep(slides[0]);load(1);
+    const load=k=>{const sl=slides[(k+slides.length)%slides.length];
+      sl.querySelectorAll("img[data-src]").forEach(im=>{im.src=im.dataset.src;im.removeAttribute("data-src")})};
+    load(1);
     const show=n=>{i=(n+slides.length)%slides.length;load(i);load(i+1);
       slides.forEach((sl,k)=>{sl.classList.toggle("on",k===i);sl.setAttribute("aria-hidden",k!==i);sl.tabIndex=k===i?0:-1});
       cap.style.opacity=0;setTimeout(()=>{cap.innerHTML=heroCaption(list[i]);cap.style.opacity=1},200)};
