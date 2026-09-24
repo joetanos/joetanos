@@ -233,6 +233,9 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .pnav a:hover{color:var(--ink)}
 .hint{font-size:13px;color:var(--muted);min-height:22px}
 dl.specs{margin-top:0}
+.finish-show{margin:-30px 0 70px}
+.finish-show img{display:block;width:100%;height:auto;cursor:zoom-in}
+.finish-show img[hidden]{display:none}
 dl.specs div{display:flex;justify-content:space-between;padding:4px 0;font-size:14px;gap:16px}
 dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-top:3px}
 
@@ -401,8 +404,8 @@ const SIZES = [
   {id:"70x100", label:"70 × 100 cm", price:220}
 ];
 const FINISHES = [
-  {id:"print", label:"Canvas Print Only", price:55}, // half the price of the gallery wrapped canvas
-  {id:"oak", label:"Gallery Wrapped Canvas", price:110}
+  {id:"print", label:"Canvas Print Only", price:55, image:"images/finish-print.jpg"}, // half the price of the gallery wrapped canvas
+  {id:"oak", label:"Gallery Wrapped Canvas", price:110, image:"images/finish-oak.jpg"}
 ];
 
 /* ---------- Collections ---------- */
@@ -755,6 +758,7 @@ function product(slug){
       </dl>
     </div>
   </div>
+  <section class="finish-show" aria-label="About the selected finish">${FINISHES.filter(f=>f.image).map(f=>`<img src="${f.image}" alt="${esc(f.label)}: details of the finish" data-fin="${f.id}" loading="lazy"${f.id===DEFAULT_FINISH?"":" hidden"}>`).join("")}</section>
   ${related.length?`<section class="block"><div class="rule sec-head"><h2>Related work</h2></div><div class="grid4">${related.map(card).join("")}</div></section>`:""}
   </div>`;
 }
@@ -854,6 +858,7 @@ function bind(page,arg){
       try{ await navigator.clipboard.writeText(data.url); toast("Link copied") }
       catch(e){ prompt("Copy this link:",data.url) }
     };
+    document.querySelectorAll(".finish-show img").forEach(im=>im.onclick=()=>openViewer([im],0));
     const g=$(".gallery"); if(!g) return;
     const slides=[...g.querySelectorAll(".stage .ph")], thumbs=[...g.querySelectorAll(".thumbs button")];
     const show=i=>{i=(i+slides.length)%slides.length;g.dataset.i=i;slides.forEach((s,k)=>s.hidden=k!==i);thumbs.forEach((t,k)=>t.setAttribute("aria-current",k===i));g.querySelector(".ci").textContent=i+1};
@@ -879,7 +884,7 @@ function bind(page,arg){
       o.value=v>0?r1(t===f.cl?v/ratio:v*ratio):""});
     const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return priceOf(s&&!s.custom?Math.max(0,SZ.indexOf(s)):0, fi?fi.id:"print")};
     const upd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
-      $("#customDims").hidden=!cu;$("#amount").hidden=cu;$("#amount").textContent=money(price()*qty);$("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";$("#hint").textContent=""};
+      $("#customDims").hidden=!cu;$("#amount").hidden=cu;$("#amount").textContent=money(price()*qty);$("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show img").forEach(im=>im.hidden=!fi||im.dataset.fin!==fi.id);$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
     f.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
     const p=PRINTS.find(x=>x.slug===arg), wa=$("#waBtn");
