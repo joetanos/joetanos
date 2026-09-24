@@ -214,10 +214,9 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .ico-row{display:flex;flex-direction:column;gap:12px}
 .btn.share{display:inline-flex;align-items:center;gap:10px;margin:0 0 26px;cursor:pointer}
 .btn.share svg{width:16px;height:16px}
-.pnav{display:flex;justify-content:space-between;gap:16px;margin:-40px 0 56px}
-.pnav .btn{flex:1;max-width:50%;display:flex;flex-direction:column;gap:4px;padding:8px 0;border:0;background:transparent;font-size:8px}
-.pnav .btn:last-child{text-align:right}
-.pnav .btn span{font-family:var(--serif,inherit);font-size:15px;letter-spacing:0;text-transform:none;color:var(--muted)}
+.pnav{display:flex;justify-content:space-between;gap:16px;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.pnav a{font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:6px 0}
+.pnav a:hover{color:var(--ink)}
 .hint{font-size:13px;color:var(--muted);min-height:22px}
 dl.specs{border-top:1px solid var(--line);margin-top:24px}
 dl.specs div{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;gap:16px}
@@ -707,6 +706,10 @@ function product(slug){
         <span class="count"><span class="ci">1</span> / ${im.length}</span>
       </div>
       <div class="thumbs">${im.map((m,i)=>`<button aria-label="Show photo ${i+1}" aria-current="${i===0}" data-t="${i}"><div class="ph"><img src="${m.src}" alt=""></div></button>`).join("")}</div>
+      <nav class="pnav" aria-label="More prints">
+        <a href="#/print/${prev.slug}" rel="prev">&larr; Previous print</a>
+        <a href="#/print/${next.slug}" rel="next">Next print &rarr;</a>
+      </nav>
     </div>
     <div class="pinfo">
       <h1>${esc(p.title)}</h1>
@@ -733,10 +736,6 @@ function product(slug){
       </dl>
     </div>
   </div>
-  <nav class="pnav" aria-label="More prints">
-    <a class="btn ghost" href="#/print/${prev.slug}" rel="prev">&larr; View previous</a>
-    <a class="btn ghost" href="#/print/${next.slug}" rel="next">View next &rarr;</a>
-  </nav>
   ${related.length?`<section class="block"><div class="rule sec-head"><h2>Related work</h2></div><div class="grid4">${related.map(card).join("")}</div></section>`:""}
   </div>`;
 }
