@@ -88,9 +88,6 @@ nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:
 .hero-slide.pair .pair-wrap img{width:auto;max-width:calc(50% - 6px)}
 .hero-slide.pair .pair-wrap img.second{display:block}
 .hero-stage{overflow:hidden;background:#1a1916}
-.hero-dots{position:absolute;left:20px;bottom:18px;display:flex;gap:8px;z-index:2}
-.hero-dots button{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.45);padding:0;transition:background .3s,transform .3s}
-.hero-dots button[aria-current="true"]{background:#fff;transform:scale(1.25)}
 #heroCap{transition:opacity .4s}
 .caption{font-style:italic;font-size:12px;color:var(--muted);margin-bottom:26px}
 h1,h2,h3{font-family:var(--sans);font-weight:500;letter-spacing:-.02em;line-height:1.08}
@@ -628,8 +625,7 @@ const PROCESS = `<section class="process"><div class="wrap"><h2>How prints are m
 const ARROW = `<span aria-hidden="true">→</span>`;
 
 /* ---------- Pages ---------- */
-const HERO_MAX=8;
-function heroSlides(){return PRINTS.filter(hasPhotos).slice(0,HERO_MAX)}
+function heroSlides(){return PRINTS.filter(hasPhotos)}
 function heroCaption(p){return esc(p.title.replace(/\.$/,""))+(whereText(p)?" – "+esc(whereText(p)):"")}
 let heroTimer=null;
 function home(){
@@ -638,9 +634,6 @@ function home(){
   <section class="hero" aria-roledescription="carousel" aria-label="Featured prints">
     <div class="ph hero-stage">
       ${heroSlides().map((p,i)=>`<a class="hero-slide${i?"":" on"}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${printImages(p)[0].src}" alt=""><span class="pair-wrap"><img class="fit main" ${i?"data-":""}src="${printImages(p)[0].src}" alt="${esc(p.title)}, framed on a wall">${printImages(p)[1]?`<img class="fit second" ${i?"data-":""}src="${printImages(p)[1].src}" alt="${esc(printImages(p)[1].alt)}">`:""}</span></a>`).join("")}
-      <div class="hero-dots" role="group" aria-label="Choose a print">
-        ${heroSlides().map((p,i)=>`<button data-h="${i}" aria-label="Show ${esc(p.title)}" aria-current="${i===0}"></button>`).join("")}
-      </div>
     </div>
     <div class="copy">
       <p class="caption" id="heroCap" aria-live="polite">${heroCaption(heroSlides()[0])}</p>
@@ -804,7 +797,7 @@ function route(){
 
 function bind(page,arg){
   if(page===""){
-    const slides=[...document.querySelectorAll(".hero-slide")], dots=[...document.querySelectorAll(".hero-dots button")], list=heroSlides(), cap=$("#heroCap");
+    const slides=[...document.querySelectorAll(".hero-slide")], list=heroSlides(), cap=$("#heroCap");
     let i=0;
     const prep=sl=>{const m=sl.querySelector("img.main"), sec=sl.querySelector("img.second");
       const check=()=>{if(sec&&m.naturalHeight>m.naturalWidth)sl.classList.add("pair")};
@@ -814,10 +807,8 @@ function bind(page,arg){
     prep(slides[0]);load(1);
     const show=n=>{i=(n+slides.length)%slides.length;load(i);load(i+1);
       slides.forEach((sl,k)=>{sl.classList.toggle("on",k===i);sl.setAttribute("aria-hidden",k!==i);sl.tabIndex=k===i?0:-1});
-      dots.forEach((d,k)=>d.setAttribute("aria-current",k===i));
       cap.style.opacity=0;setTimeout(()=>{cap.innerHTML=heroCaption(list[i]);cap.style.opacity=1},200)};
     const start=()=>{clearInterval(heroTimer);if(slides.length>1)heroTimer=setInterval(()=>show(i+1),5000)};
-    dots.forEach(d=>d.onclick=()=>{show(+d.dataset.h);start()});
     const stage=$(".hero-stage");
     stage.addEventListener("mouseenter",()=>clearInterval(heroTimer));
     stage.addEventListener("mouseleave",start);
