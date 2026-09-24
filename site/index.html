@@ -87,14 +87,6 @@ nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:
 .pair-wrap img.second{display:none}
 .hero-slide.pair .pair-wrap img{width:auto;max-width:calc(50% - 6px)}
 .hero-slide.pair .pair-wrap img.second{display:block}
-/* Both photos landscape: one above the other */
-.hero-slide.pair.stack .pair-wrap{flex-direction:column}
-.hero-slide.pair.stack .pair-wrap img{height:calc(50% - 6px);max-width:100%}
-/* Phones/tablets (full-width slideshow): grow the frame for stacked slides so each photo fills the width */
-@media (max-width:900px){
-  .hero .ph.hero-stage{aspect-ratio:auto;height:66.4vw;transition:height .6s ease}
-  .hero .ph.hero-stage:has(.hero-slide.on.stack){height:min(calc(133.4vw + 12px),85vh)}
-}
 .hero-stage{overflow:hidden;background:#1a1916}
 /* Two-photo slides: no blurred band, the slide ends at the photos' edges */
 .hero-stage:has(.hero-slide.pair){background:transparent}
@@ -833,9 +825,9 @@ function bind(page,arg){
   if(page===""){
     const slides=[...document.querySelectorAll(".hero-slide")], list=heroSlides(), cap=$("#heroCap");
     let i=0;
-    // Stack a slide's two photos when both turn out to be landscape
+    // When both photos turn out to be landscape, show only the main one, full size
     slides.forEach(sl=>{const ims=[...sl.querySelectorAll(".pair-wrap img")]; if(ims.length<2) return;
-      const check=()=>{if(ims.every(im=>im.complete&&im.naturalWidth)) sl.classList.toggle("stack",ims.every(im=>im.naturalWidth>im.naturalHeight))};
+      const check=()=>{if(ims.every(im=>im.complete&&im.naturalWidth)) sl.classList.toggle("pair",!ims.every(im=>im.naturalWidth>im.naturalHeight))};
       ims.forEach(im=>im.addEventListener("load",check)); check()});
     const load=k=>{const sl=slides[(k+slides.length)%slides.length];
       sl.querySelectorAll("img[data-src]").forEach(im=>{im.src=im.dataset.src;im.removeAttribute("data-src")})};
