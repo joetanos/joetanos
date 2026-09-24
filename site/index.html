@@ -90,6 +90,11 @@ nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:
 /* Both photos landscape: one above the other */
 .hero-slide.pair.stack .pair-wrap{flex-direction:column}
 .hero-slide.pair.stack .pair-wrap img{height:calc(50% - 6px);max-width:100%}
+/* Phones/tablets (full-width slideshow): grow the frame for stacked slides so each photo fills the width */
+@media (max-width:900px){
+  .hero .ph.hero-stage{aspect-ratio:auto;height:66.4vw;transition:height .6s ease}
+  .hero .ph.hero-stage:has(.hero-slide.on.stack){height:min(calc(133.4vw + 12px),85vh)}
+}
 .hero-stage{overflow:hidden;background:#1a1916}
 /* Two-photo slides: no blurred band, the slide ends at the photos' edges */
 .hero-stage:has(.hero-slide.pair){background:transparent}
