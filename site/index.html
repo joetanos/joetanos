@@ -84,9 +84,10 @@ nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:
 .pair-wrap{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;gap:12px}
 .pair-wrap img{display:block;height:100%;min-width:0;object-fit:contain}
 .pair-wrap img.main{width:100%}
-/* Single-photo slides: zoom in 50% on the room shot. Scaling from the top edge keeps the frame covered
-   and brings the wall art (usually in the upper half of room photos) toward the middle */
-.hero-slide:not(.pair) .pair-wrap img.main{transform:scale(1.5);transform-origin:50% 0}
+/* Room shot: zoom in 60% from the top edge, which brings the wall art (usually in the upper half of
+   room photos) toward the middle. The clip keeps the zoomed photo inside its own box, so on two-photo
+   slides it does not spill over the second photo. Insets: sides (1-1/1.6)/2, bottom 1-1/1.6 */
+.pair-wrap img.main{transform:scale(1.6);transform-origin:50% 0;clip-path:inset(0 18.75% 37.5%)}
 .pair-wrap img.second{display:none}
 .hero-slide.pair .pair-wrap img{width:auto;max-width:calc(50% - 6px)}
 .hero-slide.pair .pair-wrap img.second{display:block}
