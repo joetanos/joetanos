@@ -91,6 +91,8 @@ From now on, edit only the sheet. Changes appear on the site within about
 | `images` | Photo links separated by ` \| `. **The first link is the main image**, the second shows on hover, all of them appear in the gallery. |
 | `sizes` | Optional, only for prints with their own sizes: `30 × 45 cm = 60 \| 50 × 75 cm = 120`. Empty = the standard sizes. |
 | `show` | `yes`, or `no` to hide a print without deleting it. |
+| `focus` | Optional. Where the poster sits in the first (room) photo, as % across and % down: `48 33`. The home slideshow centres on this point. Empty = `53 35`. |
+| `zoom` | Optional. How far the home slideshow zooms into the room photo: `1.35`. Empty = `1.5`. Use less for wide posters or triptychs. |
 
 The order of the rows is the order on the site. Collections, standard sizes,
 finishes, prices and the WhatsApp number stay in `index.html`.

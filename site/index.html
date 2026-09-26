@@ -84,10 +84,11 @@ nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:
 .pair-wrap{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;gap:12px}
 .pair-wrap img{display:block;height:100%;min-width:0;object-fit:contain}
 .pair-wrap img.main{width:100%}
-/* Room shot: zoom in and center on where the wall art usually hangs in room photos (--fx/--fy, the
-   poster centre as a share of the photo). --fy must stay between 50%/--z and 100%-50%/--z (same for
-   --fx) so the zoomed photo still covers its box. The clip keeps it inside its own box, so on
-   two-photo slides it does not spill over the second photo */
+/* Room shot: zoom in (--z) and center on where the wall art usually hangs in room photos (--fx/--fy,
+   the poster centre as a share of the photo). A print can override these from the sheet (see
+   heroFocus). --fy must stay between 50%/--z and 100%-50%/--z (same for --fx) so the zoomed photo
+   still covers its box. The clip keeps it inside its own box, so on two-photo slides it does not
+   spill over the second photo */
 .pair-wrap img.main{--z:1.5;--fx:53%;--fy:35%;
   transform:scale(var(--z)) translate(calc(50% - var(--fx)),calc(50% - var(--fy)));
   clip-path:inset(calc(var(--fy) - 50%/var(--z)) calc(100% - var(--fx) - 50%/var(--z)) calc(100% - var(--fy) - 50%/var(--z)) calc(var(--fx) - 50%/var(--z)))}
@@ -571,7 +572,7 @@ function rowToPrint(r){
     desc:g("description","desc"), coords:g("coordinates","coords"),
     collections:g("collections","collection").split(/[,|\n]/).map(collectionSlug).filter(Boolean),
     images:g("images","image","photos").split(/\||\n|\s+(?=https?:)/).map(x=>x.trim()).filter(Boolean),
-    sizes:sizes.length?sizes:undefined};
+    sizes:sizes.length?sizes:undefined, focus:g("focus"), zoom:g("zoom")};
 }
 async function loadCatalog(){
   if(!CATALOG_URL) return;
@@ -667,6 +668,15 @@ function heroSlides(){
   }
   return heroOrder;
 }
+/* Home slideshow crop of the room photo, from the sheet's optional "focus" column (where the poster's
+   centre is, as % across and % down the photo, e.g. "48 33") and "zoom" column (e.g. "1.35").
+   Empty cells keep the defaults in the CSS. The point is clamped so the zoomed photo still fills its box. */
+function heroFocus(p){
+  const z=Math.max(1,parseFloat(p.zoom)||1.5), [x,y]=(String(p.focus||"").match(/-?[\d.]+/g)||[]).map(Number);
+  if(!p.zoom&&x==null) return "";
+  const lim=v=>Math.min(100-50/z,Math.max(50/z,v));
+  return ` style="--z:${z};--fx:${lim(x??53)}%;--fy:${lim(y??35)}%"`;
+}
 function heroCaption(p){return esc(p.title.replace(/\.$/,""))+(whereText(p)?" – "+esc(whereText(p)):"")}
 let heroTimer=null;
 function home(){
@@ -674,7 +684,7 @@ function home(){
   return `
   <section class="hero" aria-roledescription="carousel" aria-label="Featured prints">
     <div class="ph hero-stage">
-      ${heroSlides().map((p,i)=>`<a class="hero-slide${i?"":" on"}${printImages(p)[1]?" pair":""}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${printImages(p)[0].src}" alt=""><span class="pair-wrap"><img class="fit main" ${i?"data-":""}src="${printImages(p)[0].src}" alt="${esc(p.title)}, framed on a wall">${printImages(p)[1]?`<img class="fit second" ${i?"data-":""}src="${printImages(p)[1].src}" alt="${esc(printImages(p)[1].alt)}">`:""}</span></a>`).join("")}
+      ${heroSlides().map((p,i)=>`<a class="hero-slide${i?"":" on"}${printImages(p)[1]?" pair":""}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${printImages(p)[0].src}" alt=""><span class="pair-wrap"><img class="fit main"${heroFocus(p)} ${i?"data-":""}src="${printImages(p)[0].src}" alt="${esc(p.title)}, framed on a wall">${printImages(p)[1]?`<img class="fit second" ${i?"data-":""}src="${printImages(p)[1].src}" alt="${esc(printImages(p)[1].alt)}">`:""}</span></a>`).join("")}
     </div>
     <div class="copy">
       <p class="caption" id="heroCap" aria-live="polite">${heroCaption(heroSlides()[0])}</p>
