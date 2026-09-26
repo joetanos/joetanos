@@ -94,6 +94,9 @@ nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:
   clip-path:inset(calc(var(--fy) - 50%/var(--z)) calc(100% - var(--fx) - 50%/var(--z)) calc(100% - var(--fy) - 50%/var(--z)) calc(var(--fx) - 50%/var(--z)))}
 .pair-wrap img.second{display:none}
 .hero-slide.pair .pair-wrap img{width:auto;max-width:calc(50% - 6px)}
+/* Size the room shot to its own shape (no letterbox bands) so the zoom above lines up with the photo
+   and the photo stays vertically centred next to the second one */
+.hero-slide.pair .pair-wrap img.main{height:auto;max-height:100%}
 .hero-slide.pair .pair-wrap img.second{display:block}
 .hero-stage{overflow:hidden;background:#1a1916}
 /* Two-photo slides: no blurred band, the slide ends at the photos' edges */
