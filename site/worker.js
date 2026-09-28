@@ -29,13 +29,17 @@ export default {
         // Run before anything else loads: relative links resolve from the site root,
         // and the address bar shows the normal print page.
         el.prepend(`<base href="/"><script>history.replaceState(null,"","/#/print/${encodeURIComponent(slug)}")</script>`, { html: true });
-        el.append(`<meta property="og:url" content="${esc(url.href)}"><meta property="og:type" content="product"><meta name="twitter:card" content="summary_large_image">`, { html: true });
       }})
       .on("title", { element(el) { el.setInnerContent(title) } })
+      .on('meta[property="og:url"]', set(url.href))
+      .on('meta[property="og:type"]', set("product"))
       .on('meta[property="og:title"]', set(title))
       .on('meta[property="og:description"]', set(desc))
       .on('meta[name="description"]', set(desc))
       .on('meta[property="og:image"]', set(image))
+      .on('meta[property="og:image:alt"]', set(print.title))
+      // The brand card's size doesn't apply to the print's photo
+      .on('meta[property="og:image:width"], meta[property="og:image:height"]', { element(el) { el.remove() } })
       .transform(page);
     const out = new Response(res.body, res);
     out.headers.set("Cache-Control", "public, max-age=300");
