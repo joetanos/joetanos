@@ -133,6 +133,18 @@ section.block{padding:0 0 80px}
 .pcard h3{font-size:12.5px;font-weight:500;letter-spacing:0;line-height:1.35;margin-bottom:4px}
 .pcard .where{font-style:italic;font-size:11.5px;color:var(--muted);margin-bottom:6px}
 .pcard .price{font-family:var(--sans);font-size:11px}
+
+/* Poster box helper page (#/poster-box) */
+.ptool{padding-bottom:80px}
+.ptool-in{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+.ptool-in select,.ptool-in input{font:inherit;padding:10px 12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);min-width:0;flex:1 1 260px}
+.ptool-cols{display:grid;grid-template-columns:2fr 1fr;gap:32px;align-items:start}
+.ptool-stage{position:relative;cursor:crosshair;touch-action:none;user-select:none}
+.ptool-stage img{display:block;width:100%;height:auto}
+#ptSel{position:absolute;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.45);pointer-events:none}
+.ptool-stage{overflow:hidden}
+.ptool-out{display:flex;align-items:center;gap:12px;margin-top:8px}
+.ptool-out code{font-size:15px}
 .more{display:flex;justify-content:flex-end;margin-top:34px}
 .small-link{display:inline-flex;gap:10px;align-items:center;opacity:.75}.small-link:hover{opacity:1}
 
@@ -301,7 +313,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
   nav.main.open{display:flex}
   .menu-btn{display:block}
   header.site .wrap{gap:14px}
-  .cgrid,.grid3,footer .cols{grid-template-columns:1fr}
+  .cgrid,.grid3,footer .cols,.ptool-cols{grid-template-columns:1fr}
   .ccard.tall .ph{aspect-ratio:4/3}
   .cookie .wrap{flex-direction:column;align-items:flex-start;gap:12px}
   .cart-row{grid-template-columns:70px 1fr}
@@ -577,7 +589,7 @@ function rowToPrint(r){
     desc:g("description","desc"), coords:g("coordinates","coords"),
     collections:g("collections","collection").split(/[,|\n]/).map(collectionSlug).filter(Boolean),
     images:g("images","image","photos").split(/\||\n|\s+(?=https?:)/).map(x=>x.trim()).filter(Boolean),
-    sizes:sizes.length?sizes:undefined, focus:g("focus"), zoom:g("zoom")};
+    sizes:sizes.length?sizes:undefined, focus:g("focus"), zoom:g("zoom"), poster:g("poster")};
 }
 async function loadCatalog(){
   if(!CATALOG_URL) return;
@@ -611,6 +623,26 @@ let cart = store("jt-cart") || [];
 function saveCart(){store("jt-cart",cart)}
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2400)}
 
+/* Grid card crop from the sheet's optional "poster" column: the poster's edges in the first (room)
+   photo, as % across and % down: left top right bottom, e.g. "30 12 70 58" (the #/poster-box page
+   measures it). The photo is zoomed so the poster sits in the middle of the card with CARD_MARGIN
+   of wall around it; near the photo's own edges the crop stops there instead of showing a gap. */
+const CARD_MARGIN=0.1; // share of the card's shorter side
+function posterBox(v){
+  const n=(String(v||"").match(/-?[\d.]+/g)||[]).map(Number);
+  if(n.length!==4) return null;
+  const [l,t,r,b]=n.map(x=>Math.min(100,Math.max(0,x)));
+  return r>l&&b>t?[l,t,r,b]:null;
+}
+function posterCrop(im,v){
+  const b=posterBox(v), box=im.parentNode, W=box.clientWidth, H=box.clientHeight, nw=im.naturalWidth, nh=im.naturalHeight;
+  if(!b||!W||!H||!nw||!nh) return;
+  const M=CARD_MARGIN*Math.min(W,H), pw=(b[2]-b[0])/100*nw, ph=(b[3]-b[1])/100*nh;
+  const s=Math.max(Math.min((W-2*M)/pw,(H-2*M)/ph), W/nw, H/nh), w=nw*s, h=nh*s;
+  const fit=(v,lo)=>Math.min(0,Math.max(lo,v));
+  const x=fit(W/2-(b[0]+b[2])/200*w, W-w), y=fit(H/2-(b[1]+b[3])/200*h, H-h);
+  Object.assign(im.style,{position:"absolute",maxWidth:"none",objectFit:"fill",width:w/W*100+"%",height:h/H*100+"%",left:x/W*100+"%",top:y/H*100+"%"});
+}
 function cardFit(im){if(im.naturalHeight>im.naturalWidth*1.05){im.classList.add("pt");if(!im.classList.contains("alt"))im.parentNode.classList.add("portrait")}}
 const CARD_COVER={}; // which photo (0-based) the grid card shows; the print page keeps its own order
 function card(p){
@@ -618,8 +650,10 @@ function card(p){
   const ci = Math.min(CARD_COVER[p.slug]||0, all.length-1);
   const im = [all[ci], ...all.filter((_,i)=>i!==ci)];
   const fit = p.slug in CARD_COVER ? 'onload="cardFit(this)"' : ""; // show the whole tall photo instead of cropping it
+  const box = ci===0 && posterBox(p.poster);
+  const crop = box ? `onload="posterCrop(this,'${box.join(" ")}')"` : fit;
   return `<a class="pcard" href="#/print/${p.slug}">
-    <div class="ph" style="--bg:url('${im[0].src}')"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy" ${fit}>${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy" ${fit}>`:""}</div>
+    <div class="ph" style="--bg:url('${im[0].src}')"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy" ${crop}>${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy" ${fit}>`:""}</div>
     <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">${money(priceOf(defSize(p),DEFAULT_FINISH))}</p></a>`;
 }
 function collectionCovers(){
@@ -827,6 +861,35 @@ function cartPage(){
   <div class="cart-foot"><div><p class="total">Subtotal ${money(total)}</p><p style="color:var(--muted);font-size:14px">Shipping is calculated when the studio confirms your order.</p></div>
   <a class="btn" id="checkout" href="#">Send order to the studio</a></div></div>`;
 }
+/* Helper page (#/poster-box, not linked anywhere): drag a box around the poster in a print's first
+   photo, check the card preview, and copy the numbers into the sheet's "poster" column. */
+function posterTool(){
+  const list=PRINTS.filter(p=>p.images&&p.images.length);
+  return `<div class="wrap ptool"><div class="phead"><h1>Poster box</h1><p>Pick a print or paste a photo link, then drag a box around the poster. Copy the numbers into the sheet's <b>poster</b> column.</p></div>
+  <div class="ptool-in"><select id="ptPick"><option value="">Choose a print…</option>${list.map(p=>`<option value="${esc(p.slug)}">${esc(p.title)}</option>`).join("")}</select>
+  <input id="ptUrl" type="url" placeholder="…or paste a photo link"></div>
+  <div class="ptool-cols"><div class="ptool-stage" id="ptStage"><img id="ptImg" alt="" draggable="false"><div id="ptSel" hidden></div></div>
+  <div><div class="pcard"><div class="ph"><img id="ptPrev" alt=""></div></div>
+  <p class="ptool-out"><code id="ptOut">–</code> <button class="btn" id="ptCopy" type="button">Copy</button></p></div></div></div>`;
+}
+function bindPosterTool(){
+  const img=$("#ptImg"), sel=$("#ptSel"), prev=$("#ptPrev"), out=$("#ptOut"), stage=$("#ptStage");
+  let box=null, start=null;
+  const show=()=>{
+    prev.removeAttribute("style");
+    if(!box){sel.hidden=true;out.textContent="–";return}
+    const txt=box.map(v=>Math.round(v*10)/10).join(" ");
+    Object.assign(sel.style,{left:box[0]+"%",top:box[1]+"%",width:box[2]-box[0]+"%",height:box[3]-box[1]+"%"});
+    sel.hidden=false;out.textContent=txt;posterCrop(prev,txt)};
+  const load=(src,v)=>{box=posterBox(v);prev.onload=show;img.src=prev.src=src;show()};
+  $("#ptPick").onchange=e=>{const p=PRINTS.find(x=>x.slug===e.target.value);if(p){$("#ptUrl").value="";load(printImages(p)[0].src,p.poster)}};
+  $("#ptUrl").onchange=e=>{if(e.target.value.trim()){$("#ptPick").value="";load(cloudURL(e.target.value),"")}};
+  const at=e=>{const b=img.getBoundingClientRect(),c=v=>Math.min(100,Math.max(0,v));return[c((e.clientX-b.left)/b.width*100),c((e.clientY-b.top)/b.height*100)]};
+  stage.onpointerdown=e=>{if(!img.naturalWidth)return;stage.setPointerCapture(e.pointerId);start=at(e);e.preventDefault()};
+  stage.onpointermove=e=>{if(!start)return;const [x,y]=at(e);box=[Math.min(start[0],x),Math.min(start[1],y),Math.max(start[0],x),Math.max(start[1],y)];show()};
+  stage.onpointerup=()=>{start=null;if(box&&(box[2]-box[0]<1||box[3]-box[1]<1))box=null;show()};
+  $("#ptCopy").onclick=()=>{if(box&&navigator.clipboard)navigator.clipboard.writeText(out.textContent).then(()=>toast("Copied"),()=>{})};
+}
 function notFound(){return `<div class="wrap"><div class="phead"><h1>This page doesn't exist</h1><p>The link may be old. Go back to the prints to keep browsing.</p></div><div class="empty"><a class="btn" href="#/shop">See all prints</a></div></div>`}
 
 /* ---------- Router ---------- */
@@ -843,6 +906,7 @@ function route(){
   else if(page==="about"){html=about();title="About — Just Framed"}
   else if(page==="contact"){html=contact();title="Contact — Just Framed"}
   else if(page==="cart"){html=cartPage();title="Cart — Just Framed"}
+  else if(page==="poster-box"){html=posterTool();title="Poster box — Just Framed"}
   else html=notFound();
   $("#main").innerHTML=html; document.title=title; window.scrollTo(0,0);
   document.querySelectorAll("nav.main a").forEach(a=>{const h=a.getAttribute("href").slice(2);a.toggleAttribute("aria-current",page===h||(h==="shop"&&page==="print")||(h==="collections"&&page==="collection"));if(a.hasAttribute("aria-current"))a.setAttribute("aria-current","page")});
@@ -876,6 +940,7 @@ function bind(page,arg){
     stage.addEventListener("touchend",e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>40){show(i+(dx<0?1:-1));start()}x0=null});
     start();
   }
+  if(page==="poster-box") bindPosterTool();
   if(page==="shop") document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{location.hash="#/shop"+(b.dataset.f?"/"+b.dataset.f:"")});
   if(page==="print"){
     const sb=$("#shareBtn");
