@@ -130,6 +130,7 @@ section.block{padding:0 0 80px}
 .pcard .ph img.pt{position:relative;object-fit:contain}
 .pcard .ph img.alt.pt{position:absolute}
 .pcard:hover .ph .alt{opacity:1}
+.pcard .ph img.mir{filter:blur(5px);pointer-events:none}
 .pcard h3{font-size:12.5px;font-weight:500;letter-spacing:0;line-height:1.35;margin-bottom:4px}
 .pcard .where{font-style:italic;font-size:11.5px;color:var(--muted);margin-bottom:6px}
 .pcard .price{font-family:var(--sans);font-size:11px}
@@ -626,7 +627,9 @@ function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");
 /* Grid card crop from the sheet's optional "poster" column: the poster's edges in the first (room)
    photo, as % across and % down: left top right bottom, e.g. "30 12 70 58" (the #/poster-box page
    measures it). The photo is zoomed so the poster sits in the middle of the card with CARD_MARGIN
-   of wall around it; near the photo's own edges the crop stops there instead of showing a gap. */
+   of wall around it. When the poster hangs close to the photo's edge, the strip past that edge is
+   filled with a blurred mirror of the wall beside it. The zoom never lets that mirror reach the
+   poster itself, so a poster right at the edge just fills more of the card. */
 const CARD_MARGIN=0.1; // share of the card's shorter side
 function posterBox(v){
   const n=(String(v||"").match(/-?[\d.]+/g)||[]).map(Number);
@@ -636,12 +639,18 @@ function posterBox(v){
 }
 function posterCrop(im,v){
   const b=posterBox(v), box=im.parentNode, W=box.clientWidth, H=box.clientHeight, nw=im.naturalWidth, nh=im.naturalHeight;
+  box.querySelectorAll(".mir").forEach(m=>m.remove());
   if(!b||!W||!H||!nw||!nh) return;
   const M=CARD_MARGIN*Math.min(W,H), pw=(b[2]-b[0])/100*nw, ph=(b[3]-b[1])/100*nh;
-  const s=Math.max(Math.min((W-2*M)/pw,(H-2*M)/ph), W/nw, H/nh), w=nw*s, h=nh*s;
-  const fit=(v,lo)=>Math.min(0,Math.max(lo,v));
-  const x=fit(W/2-(b[0]+b[2])/200*w, W-w), y=fit(H/2-(b[1]+b[3])/200*h, H-h);
-  Object.assign(im.style,{position:"absolute",maxWidth:"none",objectFit:"fill",width:w/W*100+"%",height:h/H*100+"%",left:x/W*100+"%",top:y/H*100+"%"});
+  // Wall between the poster and the nearer photo edge, per axis (in photo pixels)
+  const ex=Math.min(b[0],100-b[2])/100*nw, ey=Math.min(b[1],100-b[3])/100*nh;
+  const s=Math.max(Math.min((W-2*M)/pw,(H-2*M)/ph), W/(pw+4*ex), H/(ph+4*ey)), w=nw*s, h=nh*s;
+  const x=W/2-(b[0]+b[2])/200*w, y=H/2-(b[1]+b[3])/200*h;
+  const place=(el,l,t)=>Object.assign(el.style,{position:"absolute",maxWidth:"none",objectFit:"fill",width:w/W*100+"%",height:h/H*100+"%",left:l/W*100+"%",top:t/H*100+"%"});
+  place(im,x,y);
+  const OV=4; // mirrors tuck under the photo's edge so the blur leaves no seam
+  [[y>0.5,x,y-h+OV,"scaleY(-1)"],[y+h<H-0.5,x,y+h-OV,"scaleY(-1)"],[x>0.5,x-w+OV,y,"scaleX(-1)"],[x+w<W-0.5,x+w-OV,y,"scaleX(-1)"]]
+    .forEach(([gap,l,t,flip])=>{if(!gap)return;const m=document.createElement("img");m.className="mir";m.alt="";m.src=im.currentSrc||im.src;place(m,l,t);m.style.transform=flip;box.insertBefore(m,im)});
 }
 function cardFit(im){if(im.naturalHeight>im.naturalWidth*1.05){im.classList.add("pt");if(!im.classList.contains("alt"))im.parentNode.classList.add("portrait")}}
 const CARD_COVER={}; // which photo (0-based) the grid card shows; the print page keeps its own order
@@ -877,7 +886,7 @@ function bindPosterTool(){
   let box=null, start=null;
   const show=()=>{
     prev.removeAttribute("style");
-    if(!box){sel.hidden=true;out.textContent="–";return}
+    if(!box){sel.hidden=true;out.textContent="–";posterCrop(prev,"");return}
     const txt=box.map(v=>Math.round(v*10)/10).join(" ");
     Object.assign(sel.style,{left:box[0]+"%",top:box[1]+"%",width:box[2]-box[0]+"%",height:box[3]-box[1]+"%"});
     sel.hidden=false;out.textContent=txt;posterCrop(prev,txt)};
