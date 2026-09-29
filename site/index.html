@@ -625,7 +625,7 @@ const sizesFor = p=>(p&&p.sizes)||SIZES;
 const sizeOptions = p=>[...sizesFor(p),CUSTOM];
 const findSize = id=>[SIZES,...PRINTS.map(p=>p.sizes||[])].flat().find(s=>s.id===id);
 // Final prices by size position (small, medium, large) and finish. Applies to every print, whatever sizes the sheet lists.
-const PRICE_TABLE = [{print:20,oak:40},{print:30,oak:55},{print:60,oak:80}];
+const PRICE_TABLE = [{print:20,oak:35},{print:30,oak:55},{print:45,oak:85}];
 const priceOf = (sizeIdx,finId)=>(PRICE_TABLE[sizeIdx]||PRICE_TABLE[PRICE_TABLE.length-1])[finId];
 const DEFAULT_SIZE = 1, DEFAULT_FINISH = "oak"; // preselected on every print page: 50 × 75 cm, gallery wrapped
 const defSize = p=>Math.min(DEFAULT_SIZE,sizesFor(p).length-1);
