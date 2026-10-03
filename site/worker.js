@@ -161,10 +161,8 @@ function beirutHour(ts) {
 async function reportNow(request, env) {
   if (!env.REPORT_KEY || request.method !== "POST" || request.headers.get("Authorization") !== `Bearer ${env.REPORT_KEY}`)
     return new Response("Not found", { status: 404 });
-  try { await dailyReport(env, Date.now(), true) } catch (e) { return new Response("Not sent: " + e.message + "
-", { status: 500 }) }
-  return new Response("Report sent
-");
+  try { await dailyReport(env, Date.now(), true) } catch (e) { return new Response("Not sent: " + e.message + "\n", { status: 500 }) }
+  return new Response("Report sent\n");
 }
 
 async function dailyReport(env, now, test) {
