@@ -4,13 +4,23 @@
    serves index.html with that print's title, description and photo in the
    preview tags; the page then switches itself to #/print/<slug> as usual.
    /img?u=<photo link>&w=<width> serves a smaller, cached copy of a photo (see sized() in index.html).
-   /t saves visit statistics sent by the page to the D1 database (see analytics/).
+   /t saves visit statistics sent by the page to the D1 database (see analytics/);
+   a summary of them is emailed every evening (dailyReport).
    Every other request is served from the static files untouched. */
+
+import { EmailMessage } from "cloudflare:email";
 
 // Keep in sync with CATALOG_URL in index.html
 const CATALOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqN9mnutNqWcd_N8J0_7H0kcn_sGsiIbF-ZNJnkYYgNFAPoR1wfc968rXAjQIBnmo4NiD3XAN7WZsh/pub?output=csv";
 
 export default {
+  // Daily visit report by email at 22:00 Beirut time. The crons (wrangler.jsonc) run at 19:00 and
+  // 20:00 UTC; only the one that is 22:00 in Beirut sends, so it follows summer and winter time.
+  async scheduled(event, env, ctx) {
+    if (beirutHour(event.scheduledTime) !== REPORT_HOUR) return;
+    ctx.waitUntil(dailyReport(env, event.scheduledTime));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === "/img") return resized(request, url, env, ctx);
@@ -133,7 +143,123 @@ function uaInfo(ua) {
   return [device, browser, os];
 }
 
+/* ---------- Daily report email ----------
+   Covers the 24 hours up to 22:00, compared with the average of the 7 days before. The address
+   must be verified in Cloudflare Email Routing; it's set in wrangler.jsonc (send_email). */
+const TZ = "Asia/Beirut", REPORT_HOUR = 22;
+const REPORT_TO = "justframed-lb@outlook.com", REPORT_FROM = "report@justframed-lb.com";
+const SITE = "https://justframed-lb.com";
+const DAY = 86400000;
+
+function beirutHour(ts) {
+  return Number(new Date(ts).toLocaleString("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" }));
+}
+
+async function dailyReport(env, now) {
+  const end = now - (now % 3600000), start = end - DAY;
+  const { results: ev } = await env.DB.prepare("SELECT * FROM events WHERE ts >= ? AND ts < ? ORDER BY ts").bind(end - 8 * DAY, end).all();
+  const titles = {};
+  try { for (const r of await catalog(env, SITE)) titles[r.slug] = r.title.replace(/\.$/, "") } catch (e) {}
+  const name = slug => titles[slug] || String(slug || "?").replace(/-/g, " ");
+
+  const day = ev.filter(e => e.ts >= start), before = ev.filter(e => e.ts < start);
+  const stats = list => {
+    const visits = new Set(list.filter(e => e.type === "view").map(e => e.sid));
+    return {
+      visitors: new Set(list.filter(e => e.type === "view").map(e => e.vid)).size, visits: visits.size,
+      views: list.filter(e => e.type === "view").length,
+      orders: list.filter(e => e.target === "WhatsApp order").length, shares: list.filter(e => e.target === "Share print").length,
+    };
+  };
+  const today = stats(day), prev = stats(before);
+  const count = list => { const o = {}; for (const k of list) if (k) o[k] = (o[k] || 0) + 1; return Object.entries(o).sort((a, b) => b[1] - a[1]) };
+  const firstOfVisit = {}; for (const e of day) firstOfVisit[e.sid] ||= e;
+  const visitsBy = f => count(Object.values(firstOfVisit).map(f));
+  const views = day.filter(e => e.type === "view");
+  const prints = count(views.filter(e => e.page === "print").map(e => e.item)).slice(0, 10).map(([slug, n]) => [name(slug), n,
+    new Set(views.filter(e => e.item === slug).map(e => e.vid)).size, day.filter(e => e.item === slug && e.target === "WhatsApp order").length]);
+  const orders = day.filter(e => e.target === "WhatsApp order");
+  const timeOf = ts => new Date(ts).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+  const dateText = new Date(end - 1).toLocaleDateString("en-GB", { timeZone: TZ, weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const avg = n => Math.round(n / 7 * 10) / 10;
+  const country = c => { try { return c ? new Intl.DisplayNames(["en"], { type: "region" }).of(c) : "Unknown" } catch (e) { return c } };
+
+  // Email-safe HTML: tables and inline styles only
+  const ink = "#1c1b18", muted = "#807a70", line = "#e5e0d7", bar = "#2a78d6";
+  const h2 = t => `<h2 style="font-size:16px;margin:28px 0 8px;color:${ink}">${esc(t)}</h2>`;
+  const none = `<p style="color:${muted};margin:0">Nothing today.</p>`;
+  const table = (head, rows) => rows.length ? `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:14px">
+    <tr>${head.map((h, i) => `<th style="text-align:${i && rows.every(r => typeof r[i] === "number") ? "right" : "left"};color:${muted};font-weight:normal;font-size:12px;padding:6px 8px;border-bottom:1px solid ${line}">${esc(h)}</th>`).join("")}</tr>
+    ${rows.map(r => `<tr>${r.map((v, i) => `<td style="text-align:${typeof v === "number" ? "right" : "left"};padding:7px 8px;border-bottom:1px solid ${line};color:${ink}">${esc(v)}</td>`).join("")}</tr>`).join("")}</table>` : none;
+  const bars = rows => { if (!rows.length) return none; const max = rows[0][1];
+    return `<table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px">${rows.slice(0, 6).map(([k, n]) => `<tr>
+      <td style="padding:4px 8px 4px 0;color:${ink};width:45%">${esc(k)}</td>
+      <td style="padding:4px 0"><div style="background:${bar};height:10px;border-radius:0 4px 4px 0;width:${Math.max(2, Math.round(n / max * 100))}%"></div></td>
+      <td style="padding:4px 0 4px 8px;text-align:right;color:${ink};width:40px">${n}</td></tr>`).join("")}</table>` };
+  const tile = (label, n, p) => `<td style="padding:6px;width:20%"><div style="border:1px solid ${line};border-radius:8px;padding:12px">
+    <div style="font-size:12px;color:${muted}">${label}</div><div style="font-size:26px;font-weight:bold;color:${ink}">${n}</div>
+    <div style="font-size:11px;color:${muted}">7-day average ${avg(p)}</div></div></td>`;
+
+  const html = `<!doctype html><html><body style="margin:0;background:#f5f2ed;font-family:Segoe UI,Helvetica,Arial,sans-serif">
+<div style="max-width:640px;margin:0 auto;padding:24px 16px;background:#fff">
+<h1 style="font-size:22px;margin:0;color:${ink}">Just Framed: daily report</h1>
+<p style="color:${muted};margin:4px 0 16px">${esc(dateText)} · last 24 hours, until 22:00</p>
+<table cellpadding="0" cellspacing="0" style="width:100%;margin:0 -6px"><tr>
+${tile("Visitors", today.visitors, prev.visitors)}${tile("Visits", today.visits, prev.visits)}${tile("Page views", today.views, prev.views)}${tile("WhatsApp orders", today.orders, prev.orders)}${tile("Shares", today.shares, prev.shares)}
+</tr></table>
+${h2("WhatsApp orders")}${table(["Time", "Print · size · finish · qty · price", "From"], orders.map(o => [timeOf(o.ts), `${name(o.item)} · ${(o.detail || "").replace(/ \| /g, " · ")}`, [o.city, country(o.country)].filter(Boolean).join(", ")]))}
+${h2("Most viewed prints")}${table(["Print", "Views", "Visitors", "Orders"], prints)}
+${h2("Where visitors came from")}${bars(visitsBy(e => e.ref || "Direct (typed or bookmarked)"))}
+${h2("Countries")}${bars(visitsBy(e => country(e.country)))}
+${h2("Devices")}${bars(visitsBy(e => e.device))}
+${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choose").map(e => e.detail)))}
+<p style="color:${muted};font-size:12px;margin-top:28px">Counts only visitors who accepted the cookie banner. Every event of the day is attached as a CSV file for Excel. For a full report with charts and navigation paths, run <code>node analytics/report.mjs</code>.</p>
+</div></body></html>`;
+
+  const text = `Just Framed daily report, ${dateText} (last 24 hours, until 22:00)\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`
+    + (orders.length ? "WhatsApp orders:\n" + orders.map(o => `${timeOf(o.ts)}  ${name(o.item)}  ${o.detail || ""}`).join("\n") + "\n\n" : "")
+    + (prints.length ? "Most viewed prints:\n" + prints.map(p => `${p[1]}  ${p[0]}`).join("\n") : "No print pages viewed today.");
+
+  const cols = ["time", "visitor", "visit", "type", "page", "item", "target", "detail", "seconds", "came_from", "country", "city", "device", "browser", "os", "language"];
+  const cell = v => v == null ? "" : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+  const csv = "﻿" + [cols, ...day.map(e => [new Date(e.ts).toLocaleString("en-GB", { timeZone: TZ }), e.vid, e.sid, e.type, e.page,
+    e.page === "print" ? name(e.item) : e.item, e.target, e.detail, e.dur == null ? "" : Math.round(e.dur / 1000), e.ref, e.country, e.city, e.device, e.browser, e.os, e.lang])]
+    .map(r => r.map(cell).join(",")).join("\r\n");
+
+  const stamp = new Date(end - 1).toLocaleDateString("en-CA", { timeZone: TZ });
+  const subject = `Just Framed: ${today.visitors} visitor${today.visitors === 1 ? "" : "s"}, ${today.orders} WhatsApp order${today.orders === 1 ? "" : "s"} (${stamp})`;
+  const raw = mime({ from: `Just Framed report <${REPORT_FROM}>`, to: REPORT_TO, subject, text, html,
+    attachment: { name: `events-${stamp}.csv`, type: "text/csv", body: csv } });
+  await env.MAILER.send(new EmailMessage(REPORT_FROM, REPORT_TO, raw));
+}
+
+function mime({ from, to, subject, text, html, attachment }) {
+  const b64 = s => { const bytes = new TextEncoder().encode(s); let bin = ""; for (const b of bytes) bin += String.fromCharCode(b); return btoa(bin).replace(/.{76}/g, "$&\r\n") };
+  const id = () => crypto.randomUUID().replace(/-/g, "");
+  const mixed = "mixed" + id(), alt = "alt" + id();
+  return [
+    `From: ${from}`, `To: ${to}`, `Subject: =?UTF-8?B?${b64(subject).replace(/\r\n/g, "")}?=`,
+    `Date: ${new Date().toUTCString().replace("GMT", "+0000")}`, `Message-ID: <${id()}@justframed-lb.com>`, "MIME-Version: 1.0",
+    `Content-Type: multipart/mixed; boundary="${mixed}"`, "",
+    `--${mixed}`, `Content-Type: multipart/alternative; boundary="${alt}"`, "",
+    `--${alt}`, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: base64", "", b64(text),
+    `--${alt}`, "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64", "", b64(html),
+    `--${alt}--`, "",
+    `--${mixed}`, `Content-Type: ${attachment.type}; charset=utf-8; name="${attachment.name}"`, `Content-Disposition: attachment; filename="${attachment.name}"`,
+    "Content-Transfer-Encoding: base64", "", b64(attachment.body),
+    `--${mixed}--`, "",
+  ].join("\r\n");
+}
+
 async function findPrint(slug, url, env) {
+  const row = (await catalog(env, url)).find(r => r.slug === slug);
+  if (!row) return null;
+  const images = (row.images || row.image || row.photos || "").split(/\||\n|\s+(?=https?:)/).map(x => x.trim()).filter(Boolean);
+  return { title: row.title, place: row.place || row.location, year: row.year, description: row.description || row.desc, image: images[0] };
+}
+
+// The visible prints from the sheet (or the backup prints.csv), each with its slug
+async function catalog(env, url) {
   let text = "";
   try {
     const r = await fetch(CATALOG_URL, { cf: { cacheTtl: 300, cacheEverything: true } });
@@ -144,22 +270,18 @@ async function findPrint(slug, url, env) {
   }
   const t = parseCSV(text);
   const head = t[0].map(h => h.trim().toLowerCase());
-  const seen = new Set();
+  const seen = new Set(), out = [];
   for (const r of t.slice(1)) {
     const row = Object.fromEntries(head.map((h, i) => [h, (r[i] ?? "").trim()]));
-    const title = row.title;
-    if (!title || /^(no|hide|hidden|false|0)$/i.test(row.show || row.visible || "")) continue;
+    if (!row.title || /^(no|hide|hidden|false|0)$/i.test(row.show || row.visible || "")) continue;
     // Same slug rules as the page, including -2, -3 for duplicates
-    const base = row.slug || slugify(title);
+    const base = row.slug || slugify(row.title);
     let s = base, k = 2;
     while (seen.has(s)) s = base + "-" + k++;
     seen.add(s);
-    if (s === slug) {
-      const images = (row.images || row.image || row.photos || "").split(/\||\n|\s+(?=https?:)/).map(x => x.trim()).filter(Boolean);
-      return { title, place: row.place || row.location, year: row.year, description: row.description || row.desc, image: images[0] };
-    }
+    out.push({ ...row, slug: s });
   }
-  return null;
+  return out;
 }
 
 function parseCSV(s) {

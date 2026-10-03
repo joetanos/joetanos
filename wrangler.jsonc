@@ -17,5 +17,15 @@
       "database_name": "justframed-analytics",
       "database_id": "70e481fa-67b3-486b-9b4e-0301a5cda7d6"
     }
+  ],
+  // Daily report email at 22:00 Beirut time (see dailyReport in worker.js)
+  "triggers": {
+    "crons": ["0 19 * * *", "0 20 * * *"]
+  },
+  "send_email": [
+    {
+      "name": "MAILER",
+      "destination_address": "justframed-lb@outlook.com"
+    }
   ]
 }
