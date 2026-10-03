@@ -25,6 +25,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/img") return resized(request, url, env, ctx);
     if (url.pathname === "/t") return track(request, url, env, ctx);
+    if (url.pathname === "/report-now") return reportNow(request, env);
     const m = url.pathname.match(/^\/p\/([^/]+)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
@@ -155,8 +156,19 @@ function beirutHour(ts) {
   return Number(new Date(ts).toLocaleString("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" }));
 }
 
-async function dailyReport(env, now) {
-  const end = now - (now % 3600000), start = end - DAY;
+// Sends the daily report right away, for testing. Works only while the REPORT_KEY secret is set
+// (npx wrangler secret put REPORT_KEY) and the request carries it as "Authorization: Bearer <key>".
+async function reportNow(request, env) {
+  if (!env.REPORT_KEY || request.method !== "POST" || request.headers.get("Authorization") !== `Bearer ${env.REPORT_KEY}`)
+    return new Response("Not found", { status: 404 });
+  try { await dailyReport(env, Date.now(), true) } catch (e) { return new Response("Not sent: " + e.message + "
+", { status: 500 }) }
+  return new Response("Report sent
+");
+}
+
+async function dailyReport(env, now, test) {
+  const end = test ? now : now - (now % 3600000), start = end - DAY;
   const { results: ev } = await env.DB.prepare("SELECT * FROM events WHERE ts >= ? AND ts < ? ORDER BY ts").bind(end - 8 * DAY, end).all();
   const titles = {};
   try { for (const r of await catalog(env, SITE)) titles[r.slug] = r.title.replace(/\.$/, "") } catch (e) {}
@@ -203,7 +215,7 @@ async function dailyReport(env, now) {
   const html = `<!doctype html><html><body style="margin:0;background:#f5f2ed;font-family:Segoe UI,Helvetica,Arial,sans-serif">
 <div style="max-width:640px;margin:0 auto;padding:24px 16px;background:#fff">
 <h1 style="font-size:22px;margin:0;color:${ink}">Just Framed: daily report</h1>
-<p style="color:${muted};margin:4px 0 16px">${esc(dateText)} · last 24 hours, until 22:00</p>
+<p style="color:${muted};margin:4px 0 16px">${esc(dateText)} · last 24 hours, until ${timeOf(end)}</p>
 <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 -6px"><tr>
 ${tile("Visitors", today.visitors, prev.visitors)}${tile("Visits", today.visits, prev.visits)}${tile("Page views", today.views, prev.views)}${tile("WhatsApp orders", today.orders, prev.orders)}${tile("Shares", today.shares, prev.shares)}
 </tr></table>
@@ -216,7 +228,7 @@ ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choos
 <p style="color:${muted};font-size:12px;margin-top:28px">Counts only visitors who accepted the cookie banner. Every event of the day is attached as a CSV file for Excel. For a full report with charts and navigation paths, run <code>node analytics/report.mjs</code>.</p>
 </div></body></html>`;
 
-  const text = `Just Framed daily report, ${dateText} (last 24 hours, until 22:00)\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`
+  const text = `Just Framed daily report, ${dateText} (last 24 hours, until ${timeOf(end)})\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`
     + (orders.length ? "WhatsApp orders:\n" + orders.map(o => `${timeOf(o.ts)}  ${name(o.item)}  ${o.detail || ""}`).join("\n") + "\n\n" : "")
     + (prints.length ? "Most viewed prints:\n" + prints.map(p => `${p[1]}  ${p[0]}`).join("\n") : "No print pages viewed today.");
 
@@ -227,7 +239,7 @@ ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choos
     .map(r => r.map(cell).join(",")).join("\r\n");
 
   const stamp = new Date(end - 1).toLocaleDateString("en-CA", { timeZone: TZ });
-  const subject = `Just Framed: ${today.visitors} visitor${today.visitors === 1 ? "" : "s"}, ${today.orders} WhatsApp order${today.orders === 1 ? "" : "s"} (${stamp})`;
+  const subject = `${test ? "[Test] " : ""}Just Framed: ${today.visitors} visitor${today.visitors === 1 ? "" : "s"}, ${today.orders} WhatsApp order${today.orders === 1 ? "" : "s"} (${stamp})`;
   const raw = mime({ from: `Just Framed report <${REPORT_FROM}>`, to: REPORT_TO, subject, text, html,
     attachment: { name: `events-${stamp}.csv`, type: "text/csv", body: csv } });
   await env.MAILER.send(new EmailMessage(REPORT_FROM, REPORT_TO, raw));
