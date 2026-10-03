@@ -962,6 +962,7 @@ function route(){
   document.querySelectorAll("#main [data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
   document.querySelectorAll("#main [data-ig]").forEach(a=>{a.href=igLink();a.target="_blank";a.rel="noopener"});
   bind(page,arg);
+  statView(page,arg);
 }
 
 function bind(page,arg){
@@ -1123,7 +1124,80 @@ document.querySelectorAll("[data-ig]").forEach(a=>{a.href=igLink();a.target="_bl
 $("#logo").innerHTML=logoHTML(); $("#logo2").innerHTML=logoHTML();
 $(".menu-btn").onclick=e=>{const o=$("#nav").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",o)};
 if(!store("jt-cookie")) $("#cookie").hidden=false;
-document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-cookie",b.dataset.c);$("#cookie").hidden=true});
+document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-cookie",b.dataset.c);$("#cookie").hidden=true;statFlush()});
+/* ---------- Visit statistics ----------
+   Records which pages are viewed and for how long, what is clicked and which sizes and finishes
+   are picked. worker.js (/t) saves it; analytics/report.mjs turns it into a report.
+   Only for visitors who click Accept on the cookie banner: until they choose, events wait here
+   and are sent if they accept, dropped if they decline. No names or IP addresses are kept. */
+const STAT={q:[], view:null, timer:null, ref:null, on:/^https?:$/.test(location.protocol)};
+const statConsent=()=>store("jt-cookie");
+const statId=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
+function stat(t,o={}){
+  if(!STAT.on||statConsent()==="decline") return;
+  STAT.q.push({t,ts:Date.now(),p:location.hash.replace(/^#/,"")||"/",...o});
+  if(!STAT.timer) STAT.timer=setTimeout(()=>{STAT.timer=null;statFlush()},4000);
+}
+function statFlush(){
+  if(statConsent()==="decline"){STAT.q=[];return}
+  if(statConsent()!=="accept"||!STAT.q.length) return;
+  let v=store("jt-vid"); if(!v){v=statId();store("jt-vid",v)}
+  let sid; try{sid=sessionStorage.getItem("jt-sid")||statId();sessionStorage.setItem("jt-sid",sid)}catch(e){sid=STAT.sid=STAT.sid||statId()}
+  while(STAT.q.length){
+    const body=JSON.stringify({v,s:sid,r:STAT.ref,e:STAT.q.splice(0,30)});
+    try{if(!navigator.sendBeacon("/t",new Blob([body],{type:"text/plain"})))fetch("/t",{method:"POST",body,keepalive:true})}catch(e){}
+  }
+}
+// Where the visit came from: a shared print link, a campaign (?utm_source=…) or another site
+STAT.ref=window.jfShared?"Shared print link"
+  :new URLSearchParams(location.search).get("utm_source")
+  ||(()=>{try{const r=new URL(document.referrer);return r.host===location.host?null:r.host.replace(/^www\./,"")}catch(e){return null}})();
+// Time on a page counts only while the tab is visible
+function statLeave(){const v=STAT.view;if(v&&v.start){stat("leave",{pg:v.pg,i:v.i,p:v.p,dur:Date.now()-v.start});v.start=0}}
+function statView(page,arg){
+  const p=location.hash.replace(/^#/,"")||"/";
+  if(STAT.view&&STAT.view.p===p) return; // the same page redrawn (catalog refresh, cart change)
+  statLeave();
+  const pg=page||"home", i=arg?decodeURIComponent(arg):undefined;
+  STAT.view={pg,i,p,start:Date.now()};
+  stat("view",{pg,i});
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden"){statLeave();statFlush()}
+  else if(STAT.view&&!STAT.view.start) STAT.view.start=Date.now();
+});
+addEventListener("pagehide",()=>{statLeave();statFlush()});
+const statPage=()=>STAT.view||{};
+document.addEventListener("click",e=>{
+  const el=e.target.closest("a,button,img"); if(!el) return;
+  const {pg,i}=statPage(), hrefSlug=h=>(h.match(/#\/(?:print|collection)\/([^/?#]+)/)||[])[1];
+  const href=el.getAttribute("href")||"";
+  let x=null, item=i, d;
+  if(el.id==="waBtn"){x="WhatsApp order";d=["#sizeLbl","#finLbl","#qty","#amount"].map(s=>$(s)&&!$(s).hidden?$(s).textContent.trim():"").filter(Boolean).join(" | ")}
+  else if(el.matches("[data-wa]")) x="WhatsApp";
+  else if(el.matches("[data-ig]")) x="Instagram";
+  else if(href.includes("facebook.com")) x="Facebook";
+  else if(href.startsWith("mailto:")) x="Email";
+  else if(el.id==="shareBtn") x="Share print";
+  else if(el.id==="checkout") x="Cart order";
+  else if(el.closest(".gallery .stage")&&el.tagName==="IMG") x="Zoom photo";
+  else if(el.closest(".gallery .thumbs")) x="Photo thumbnail";
+  else if(el.closest(".gallery .gnav")) x="Next/previous photo";
+  else if(el.closest(".finish-show")) x="Zoom finish photo";
+  else if(el.tagName==="A"&&href.startsWith("#")){
+    x=el.closest(".hero-slide")?"Slideshow":el.closest(".pcard")?"Print card":el.closest(".ccard")?"Collection card"
+      :el.closest("nav.main")?"Menu":el.closest(".pnav")?"Previous/next print":el.closest("footer")?"Footer":el.classList.contains("btn")?"Button":"Link";
+    item=hrefSlug(href); d=href.slice(1);
+  }
+  if(x) stat("click",{pg,i:item,x,d});
+},true);
+document.addEventListener("change",e=>{
+  const el=e.target; if(!el.matches||!el.matches('input[name="size"],input[name="finish"]')) return;
+  const lab=el.closest("label");
+  stat("choose",{pg:"print",i:statPage().i,x:el.name,d:lab?lab.textContent.trim():el.value});
+});
+document.addEventListener("submit",e=>{if(e.target.closest("#main")) stat("click",{pg:statPage().pg,x:"Send message form"})},true);
+
 window.addEventListener("hashchange",route);
 window.addEventListener("scroll",()=>document.querySelector("header.site").classList.toggle("scrolled",scrollY>4),{passive:true});
 saveCart();

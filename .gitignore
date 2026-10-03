@@ -1,1 +1,4 @@
 .wrangler/
+
+# Generated visit reports (analytics/report.mjs)
+analytics/reports/

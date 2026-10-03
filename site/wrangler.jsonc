@@ -9,5 +9,13 @@
   // Resizes photos for /img in worker.js
   "images": {
     "binding": "IMAGES"
-  }
+  },
+  // Visit statistics for /t in worker.js (see analytics/)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "justframed-analytics",
+      "database_id": "70e481fa-67b3-486b-9b4e-0301a5cda7d6"
+    }
+  ]
 }

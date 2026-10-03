@@ -4,6 +4,7 @@
    serves index.html with that print's title, description and photo in the
    preview tags; the page then switches itself to #/print/<slug> as usual.
    /img?u=<photo link>&w=<width> serves a smaller, cached copy of a photo (see sized() in index.html).
+   /t saves visit statistics sent by the page to the D1 database (see analytics/).
    Every other request is served from the static files untouched. */
 
 // Keep in sync with CATALOG_URL in index.html
@@ -13,6 +14,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === "/img") return resized(request, url, env, ctx);
+    if (url.pathname === "/t") return track(request, url, env, ctx);
     const m = url.pathname.match(/^\/p\/([^/]+)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
@@ -30,7 +32,8 @@ export default {
       .on("head", { element(el) {
         // Run before anything else loads: relative links resolve from the site root,
         // and the address bar shows the normal print page.
-        el.prepend(`<base href="/"><script>history.replaceState(null,"","/#/print/${encodeURIComponent(slug)}")</script>`, { html: true });
+        // jfShared tells the visit statistics that this visit came from a shared link.
+        el.prepend(`<base href="/"><script>history.replaceState(null,"","/#/print/${encodeURIComponent(slug)}");window.jfShared=1</script>`, { html: true });
       }})
       .on("title", { element(el) { el.setInnerContent(title) } })
       .on('meta[property="og:url"]', set(url.href))
@@ -85,6 +88,49 @@ async function resized(request, url, env, ctx) {
   out.headers.set("Vary", "Accept");
   ctx.waitUntil(cache.put(key, out.clone()));
   return out;
+}
+
+/* Visit statistics: the page sends {v: visitor id, s: visit id, r: referrer, e: [events]}
+   (see "Visit statistics" in index.html). Country, city, device and browser are added here;
+   the IP address is not stored. */
+const EVENT_TYPES = ["view", "leave", "click", "choose"];
+const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|headless|lighthouse|pingdom/i;
+
+async function track(request, url, env, ctx) {
+  const done = new Response(null, { status: 204 });
+  if (request.method !== "POST" || !env.DB) return done;
+  const origin = request.headers.get("Origin");
+  if (origin && origin !== url.origin) return new Response(null, { status: 403 });
+  const ua = request.headers.get("User-Agent") || "";
+  if (BOTS.test(ua)) return done;
+  let body;
+  try { body = JSON.parse((await request.text()).slice(0, 20000)) } catch (e) { return new Response(null, { status: 400 }) }
+  const events = (Array.isArray(body.e) ? body.e : []).filter(e => e && EVENT_TYPES.includes(e.t)).slice(0, 40);
+  if (!events.length) return done;
+
+  const s = (v, n = 200) => v == null || v === "" ? null : String(v).slice(0, n);
+  const cf = request.cf || {};
+  const who = [s(body.r), s(cf.country, 8), s(cf.city, 80), ...uaInfo(ua), s(request.headers.get("Accept-Language")?.split(/[,;]/)[0], 20)];
+  const now = Date.now();
+  const insert = env.DB.prepare(`INSERT INTO events (ts, vid, sid, type, path, page, item, target, detail, dur, ref, country, city, device, browser, os, lang)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const rows = events.map(e => insert.bind(
+    Math.min(now, Math.max(now - 86400000, Number(e.ts) || now)), s(body.v, 40), s(body.s, 40), e.t,
+    s(e.p), s(e.pg, 40), s(e.i, 100), s(e.x, 100), s(e.d, 300),
+    Number.isFinite(Number(e.dur)) && e.dur != null ? Math.min(Math.max(0, Math.round(e.dur)), 3600000) : null,
+    ...who));
+  ctx.waitUntil(env.DB.batch(rows).catch(err => console.error("Visit statistics not saved", err)));
+  return done;
+}
+
+function uaInfo(ua) {
+  const device = /iPad|Tablet/i.test(ua) ? "Tablet" : /Mobi|Android|iPhone/i.test(ua) ? "Mobile" : "Desktop";
+  const browser = /Instagram/.test(ua) ? "Instagram app" : /FBAN|FBAV/.test(ua) ? "Facebook app" : /Edg\//.test(ua) ? "Edge"
+    : /OPR\//.test(ua) ? "Opera" : /SamsungBrowser/.test(ua) ? "Samsung Internet" : /Firefox|FxiOS/.test(ua) ? "Firefox"
+    : /Chrome|CriOS/.test(ua) ? "Chrome" : /Safari/.test(ua) ? "Safari" : "Other";
+  const os = /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows"
+    : /Mac OS X/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "Other";
+  return [device, browser, os];
 }
 
 async function findPrint(slug, url, env) {

@@ -101,6 +101,24 @@ finishes, prices and the WhatsApp number stay in `index.html`.
 The photos in `images/` (and the prints written in `index.html`) are only a
 backup: the site uses them if the sheet can't be reached.
 
+## Visit statistics
+
+When the site runs on Cloudflare, it records which pages people view and for
+how long, what they click (WhatsApp, share, photos…), which sizes and finishes
+they pick, and where they came from. This only applies to visitors who click
+**Accept** on the cookie banner. It's saved in the Cloudflare D1 database
+`justframed-analytics`. No names or IP addresses are kept.
+
+To get a report, run this in the project folder (one level above this one).
+You need Node.js and a one-time `npx wrangler login`:
+```
+node analytics/report.mjs            last 30 days
+node analytics/report.mjs --days 7   last 7 days
+node analytics/report.mjs --all      everything
+```
+It writes an HTML report, a PDF copy and a CSV file for Excel into
+`analytics/reports/`.
+
 ## Custom domain
 Every option above lets you connect your own domain (e.g. joetanos.com) from
 its domain/DNS settings page.
