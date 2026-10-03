@@ -561,6 +561,17 @@ function cloudURL(u){
   if(c && !/^[a-z]{1,3}_[^/]*\//.test(c[2])) return c[1]+"f_auto,q_auto,c_limit,w_1800/"+c[2];
   return u;
 }
+/* Smaller copy of a photo, w = width in CSS pixels it's shown at. worker.js (/img) resizes and
+   caches it; if that fails, the error handler below swaps the original back in. */
+const IMG_HOSTS=["photos.justframed-lb.com","pub-072a6b055ac5436297717deddd7c9512.r2.dev"]; // keep in sync with worker.js
+function sized(src,w){
+  if(!/^https?:$/.test(location.protocol)) return src;
+  let u;try{u=new URL(src,location.href)}catch(e){return src}
+  if(u.origin!==location.origin&&!IMG_HOSTS.includes(u.hostname)) return src;
+  return "/img?u="+encodeURIComponent(u.href)+"&w="+Math.round(w*Math.min(2,window.devicePixelRatio||1));
+}
+document.addEventListener("error",e=>{const im=e.target;
+  if(im.tagName==="IMG"&&(im.getAttribute("src")||"").startsWith("/img?")) im.src=new URLSearchParams(im.getAttribute("src").slice(5)).get("u")},true);
 function hasPhotos(p){return !!((p.images&&p.images.length)||IMAGES[p.slug+"-1"])}
 function printImages(p){
   if(p.images&&p.images.length)
@@ -602,17 +613,36 @@ function rowToPrint(r){
     images:g("images","image","photos").split(/\||\n|\s+(?=https?:)/).map(x=>x.trim()).filter(Boolean),
     sizes:sizes.length?sizes:undefined, focus:g("focus"), zoom:g("zoom"), poster:g("poster")};
 }
-async function loadCatalog(){
-  if(!CATALOG_URL) return;
+function useCatalog(text){
   try{
-    const url=CATALOG_URL+(CATALOG_URL.includes("?")?"&":"?")+"t="+Date.now();
-    const text=await (await fetch(url,{cache:"no-store"})).text();
     let rows;
     if(/^\s*[\[{]/.test(text)){const j=JSON.parse(text);rows=Array.isArray(j)?j:(j.prints||[])}
     else{const t=parseCSV(text);const head=t[0].map(h=>h.trim().toLowerCase());rows=t.slice(1).map(r=>Object.fromEntries(head.map((h,i)=>[h,r[i]??""])))}
     const list=rows.map(r=>r.title?rowToPrint(r):null).filter(Boolean);
-    if(list.length){const seen=new Set();list.forEach(p=>{let s=p.slug,k=2;while(seen.has(s))s=p.slug+"-"+k++;p.slug=s;seen.add(s)});PRINTS=list}
-  }catch(e){console.warn("Catalog could not be loaded, using the built-in prints instead.",e)}
+    if(list.length){const seen=new Set();list.forEach(p=>{let s=p.slug,k=2;while(seen.has(s))s=p.slug+"-"+k++;p.slug=s;seen.add(s)});PRINTS=list;return true}
+  }catch(e){console.warn("Catalog could not be read, using the built-in prints instead.",e)}
+  return false;
+}
+/* The sheet takes a second or two to answer, so the page first shows the copy saved on the
+   last visit, then fetches the sheet and redraws only if something changed. */
+async function loadCatalog(){
+  if(!CATALOG_URL) return;
+  const saved=store("jt-catalog");
+  let shown=false;
+  const fresh=(async()=>{
+    try{
+      const url=CATALOG_URL+(CATALOG_URL.includes("?")?"&":"?")+"t="+Date.now();
+      const text=await (await fetch(url,{cache:"no-store"})).text();
+      if(text===saved) return;
+      // Redraw in place, keeping the visitor where they were on the page
+      if(useCatalog(text)){store("jt-catalog",text);if(shown){const y=scrollY;route();scrollTo(0,y)}}
+    }catch(e){console.warn("Catalog could not be loaded, using the built-in prints instead.",e)}
+  })();
+  // A link to a print the saved copy doesn't have yet (e.g. just added to the sheet) waits for the sheet
+  const [page,arg]=location.hash.replace(/^#\/?/,"").split("/");
+  const known=()=>page!=="print"||PRINTS.some(p=>p.slug===arg);
+  if(saved&&useCatalog(saved)&&known()){shown=true;return}
+  await fresh;
 }
 
 /* ---------- Helpers ---------- */
@@ -670,7 +700,7 @@ function card(p){
   const box = ci===0 && posterBox(p.poster);
   const crop = box ? `onload="posterCrop(this,'${box.join(" ")}')"` : fit;
   return `<a class="pcard" href="#/print/${p.slug}">
-    <div class="ph" style="--bg:url('${im[0].src}')"><img src="${im[0].src}" alt="${esc(im[0].alt)}" loading="lazy" ${crop}>${im[1]?`<img class="alt" src="${im[1].src}" alt="" loading="lazy" ${fit}>`:""}</div>
+    <div class="ph" style="--bg:url('${sized(im[0].src,200)}')"><img src="${sized(im[0].src,700)}" alt="${esc(im[0].alt)}" loading="lazy" ${crop}>${im[1]?`<img class="alt" src="${sized(im[1].src,500)}" alt="" loading="lazy" ${fit}>`:""}</div>
     <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">${money(priceOf(defSize(p),DEFAULT_FINISH))}</p></a>`;
 }
 function collectionCovers(){
@@ -703,7 +733,7 @@ function collectionCovers(){
   return out;
 }
 function ccard(c,covers){
-  return `<a class="ccard ${c.tall?"tall":""}" href="#/collection/${c.slug}"><div class="ph"><img src="${covers[c.slug]}" alt="" loading="lazy"></div>
+  return `<a class="ccard ${c.tall?"tall":""}" href="#/collection/${c.slug}"><div class="ph"><img src="${sized(covers[c.slug],700)}" alt="" loading="lazy"></div>
     <div class="ov"><h3>${esc(c.name)}</h3><p>${esc(c.blurb)}</p></div></a>`;
 }
 const PROCESS = `<section class="process"><div class="wrap"><h2>How prints are made</h2><div class="grid3">
@@ -740,7 +770,8 @@ function home(){
   return `
   <section class="hero" aria-roledescription="carousel" aria-label="Featured prints">
     <div class="ph hero-stage">
-      ${heroSlides().map((p,i)=>`<a class="hero-slide${i?"":" on"}${printImages(p)[1]?" pair":""}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${printImages(p)[0].src}" alt=""><span class="pair-wrap"><img class="fit main"${heroFocus(p)} ${i?"data-":""}src="${printImages(p)[0].src}" alt="${esc(p.title)}, framed on a wall">${printImages(p)[1]?`<img class="fit second" ${i?"data-":""}src="${printImages(p)[1].src}" alt="${esc(printImages(p)[1].alt)}">`:""}</span></a>`).join("")}
+      ${heroSlides().map((p,i)=>{const im=printImages(p), main=sized(im[0].src,Math.min(1400,innerWidth*1.5));
+        return `<a class="hero-slide${i?"":" on"}${im[1]?" pair":""}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${main}" alt=""><span class="pair-wrap"><img class="fit main"${heroFocus(p)} ${i?"data-":""}src="${main}" alt="${esc(p.title)}, framed on a wall">${im[1]?`<img class="fit second" ${i?"data-":""}src="${sized(im[1].src,Math.min(700,innerWidth))}" alt="${esc(im[1].alt)}">`:""}</span></a>`}).join("")}
     </div>
     <div class="copy">
       <p class="caption" id="heroCap" aria-live="polite">${heroCaption(heroSlides()[0])}</p>
@@ -801,11 +832,11 @@ function product(slug){
   return `<div class="wrap"><div class="product">
     <div class="gallery" data-i="0">
       <div class="stage">
-        ${im.map((m,i)=>`<div class="ph" ${i?"hidden":""}><img src="${m.src}" alt="${esc(m.alt)}"></div>`).join("")}
+        ${im.map((m,i)=>`<div class="ph" ${i?"hidden":""}><img src="${sized(m.src,Math.min(800,innerWidth))}" data-full="${m.src}" alt="${esc(m.alt)}"></div>`).join("")}
         ${im.length>1?`<button class="gnav prev" aria-label="Previous photo"><svg viewBox="0 0 22 40" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 3 4 20l14 17"/></svg></button><button class="gnav next" aria-label="Next photo"><svg viewBox="0 0 22 40" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 3l14 17L4 37"/></svg></button>`:""}
         <span class="count"><span class="ci">1</span> / ${im.length}</span>
       </div>
-      <div class="thumbs">${im.map((m,i)=>`<button aria-label="Show photo ${i+1}" aria-current="${i===0}" data-t="${i}"><div class="ph"><img src="${m.src}" alt=""></div></button>`).join("")}</div>
+      <div class="thumbs">${im.map((m,i)=>`<button aria-label="Show photo ${i+1}" aria-current="${i===0}" data-t="${i}"><div class="ph"><img src="${sized(m.src,150)}" alt=""></div></button>`).join("")}</div>
       <nav class="pnav" aria-label="More prints">
         <a href="#/print/${prev.slug}" rel="prev">&larr; Previous print</a>
         <a href="#/print/${next.slug}" rel="next">Next print &rarr;</a>
@@ -871,7 +902,7 @@ function cartPage(){
   const total = cart.reduce((a,it)=>a+it.price*it.qty,0);
   return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div>
   ${cart.map((it,i)=>{const p=PRINTS.find(x=>x.slug===it.slug);if(!p)return "";const im=printImages(p);
-    return `<div class="cart-row"><a href="#/print/${p.slug}" class="ph"><img src="${im[0].src}" alt=""></a>
+    return `<div class="cart-row"><a href="#/print/${p.slug}" class="ph"><img src="${sized(im[0].src,150)}" alt=""></a>
     <div><h3>${esc(p.title)}</h3><p class="meta">${esc(findSize(it.size).label)}, ${esc(FINISHES.find(f=>f.id===it.finish).label.toLowerCase())}</p>
       <div class="qty" style="display:inline-flex;margin-top:8px"><button data-cq="${i}" data-d="-1" aria-label="Decrease">−</button><output>${it.qty}</output><button data-cq="${i}" data-d="1" aria-label="Increase">+</button></div></div>
     <div class="right">${money(it.price*it.qty)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
@@ -1046,7 +1077,7 @@ function openViewer(imgs,start,onChange){
     s=ns; tx=px-cx-s*qx; ty=py-cy-s*qy; if(s===1) tx=ty=0; clamp()};
   const toggle=(x,y)=>{zoomAt(s>1.01?1:2.5,x,y);apply(true)};
   const onImg=(x,y)=>{const r=im.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom};
-  const go=n=>{i=(n+imgs.length)%imgs.length; s=1; tx=ty=0; im.src=imgs[i].currentSrc||imgs[i].src; im.alt=imgs[i].alt;
+  const go=n=>{i=(n+imgs.length)%imgs.length; s=1; tx=ty=0; im.src=imgs[i].dataset.full||imgs[i].currentSrc||imgs[i].src; im.alt=imgs[i].alt;
     if(cnt) cnt.textContent=`${i+1} / ${imgs.length}`; apply(); onChange&&onChange(i)};
   const key=e=>{if(e.key==="Escape")close();else if(e.key==="ArrowLeft")go(i-1);else if(e.key==="ArrowRight")go(i+1)};
   const resize=()=>{clamp();apply()};

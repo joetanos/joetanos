@@ -3,14 +3,16 @@
    after "#", so they always showed the home page. For /p/<slug> this worker
    serves index.html with that print's title, description and photo in the
    preview tags; the page then switches itself to #/print/<slug> as usual.
+   /img?u=<photo link>&w=<width> serves a smaller, cached copy of a photo (see sized() in index.html).
    Every other request is served from the static files untouched. */
 
 // Keep in sync with CATALOG_URL in index.html
 const CATALOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqN9mnutNqWcd_N8J0_7H0kcn_sGsiIbF-ZNJnkYYgNFAPoR1wfc968rXAjQIBnmo4NiD3XAN7WZsh/pub?output=csv";
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === "/img") return resized(request, url, env, ctx);
     const m = url.pathname.match(/^\/p\/([^/]+)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
@@ -46,6 +48,44 @@ export default {
     return out;
   }
 };
+
+// Hosts /img may resize photos from (besides this site). Keep in sync with IMG_HOSTS in index.html
+const IMG_HOSTS = ["photos.justframed-lb.com", "pub-072a6b055ac5436297717deddd7c9512.r2.dev"];
+const IMG_WIDTHS = [200, 400, 800, 1200, 1600, 2000];
+
+async function resized(request, url, env, ctx) {
+  let src;
+  try { src = new URL(url.searchParams.get("u") || "", url) } catch (e) { return new Response("Bad image link", { status: 400 }) }
+  const local = src.origin === url.origin;
+  if (!local && !IMG_HOSTS.includes(src.hostname)) return new Response("Image host not allowed", { status: 403 });
+  // Round up to a fixed width so each photo only ever has a few cached sizes
+  const asked = parseInt(url.searchParams.get("w")) || 800;
+  const width = IMG_WIDTHS.find(w => w >= asked) || IMG_WIDTHS[IMG_WIDTHS.length - 1];
+  const accept = request.headers.get("Accept") || "";
+  const format = accept.includes("image/avif") ? "image/avif" : accept.includes("image/webp") ? "image/webp" : "image/jpeg";
+
+  const cache = caches.default;
+  const key = new Request(`${url.origin}/img?u=${encodeURIComponent(src.href)}&w=${width}&f=${format}`);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+
+  const original = local ? await env.ASSETS.fetch(new Request(src, request)) : await fetch(src, { cf: { cacheTtl: 3600, cacheEverything: true } });
+  if (!original.ok) return new Response("Image not found", { status: original.status });
+  const type = original.headers.get("Content-Type") || "image/jpeg";
+  let out;
+  try {
+    const img = await env.IMAGES.input(original.clone().body).transform({ width, fit: "scale-down" }).output({ format, quality: 82 });
+    out = new Response(img.response().body, { headers: { "Content-Type": format } });
+  } catch (e) {
+    // Resizing unavailable: send the photo as it is, so the page still works
+    return new Response(original.body, { headers: { "Content-Type": type, "Cache-Control": "public, max-age=3600" } });
+  }
+  // A day, so a photo replaced under the same file name shows up by the next day
+  out.headers.set("Cache-Control", "public, max-age=86400");
+  out.headers.set("Vary", "Accept");
+  ctx.waitUntil(cache.put(key, out.clone()));
+  return out;
+}
 
 async function findPrint(slug, url, env) {
   let text = "";

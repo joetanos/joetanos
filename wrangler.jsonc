@@ -5,5 +5,9 @@
   "assets": {
     "directory": "./site",
     "binding": "ASSETS"
+  },
+  // Resizes photos for /img in worker.js
+  "images": {
+    "binding": "IMAGES"
   }
 }
