@@ -782,7 +782,7 @@ function home(){
   </section>
   <section class="block"><div class="wrap">
     <div class="rule sec-head"><h2>Currently on the wall</h2></div>
-    <div class="grid4">${PRINTS.map(card).join("")}</div>
+    <div class="grid4">${[...PRINTS].reverse().map(card).join("")}</div>
   </div></section>
   <section class="band"><div class="wrap">
     <div class="sec-head"><h2>Collections</h2><p>Work grouped by what it looks at.</p></div>
