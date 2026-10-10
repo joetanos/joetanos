@@ -208,7 +208,7 @@ footer a:hover{color:var(--ink)}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:34px}
 /* All prints: under the collection filters, a line with the number of prints and the Sort menu
    (the same header as "Currently on the wall" on the home page) */
-.sec-head .count{font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-style:normal;color:var(--muted)}
+.sec-head .shop-count{font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-style:normal;color:var(--muted)}
 .chip{font-family:var(--sans);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 13px;border:1px solid var(--line)}
 .chip[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
 
@@ -974,7 +974,7 @@ function shop(filter){
     <button class="chip" data-f="" aria-pressed="${!filter}">All</button>
     ${COLLECTIONS.map(c=>`<button class="chip" data-f="${c.slug}" aria-pressed="${filter===c.slug}">${esc(c.name)}</button>`).join("")}
   </div>
-  <div class="rule sec-head"><p class="count">${(n=>`${n} print${n===1?"":"s"}`)(shopPrints(filter).length)}</p>${sortMenu()}</div>
+  <div class="rule sec-head"><p class="shop-count">${(n=>`${n} print${n===1?"":"s"}`)(shopPrints(filter).length)}</p>${sortMenu()}</div>
   <section class="block"><div class="grid4" id="wallGrid">${shopPrints(filter).map(card).join("")}</div></section></div>`;
 }
 
