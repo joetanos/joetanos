@@ -1222,13 +1222,14 @@ function openViewer(imgs,start,onChange){
 }
 
 /* ---------- Newsletter pop-up ----------
-   Opens a few seconds into a visit; once closed, it comes back a week later, and never after
-   signing up. The sign-up goes to /subscribe (worker.js), which keeps it and returns the visitor's
-   promo code, or emails it to them when it can. The code stays on this device for print pages. */
+   Opens a few seconds into every visit until the visitor signs up. Closing it hides it for the
+   rest of the visit (sessionStorage, which ends when the tab is closed). The sign-up goes to
+   /subscribe (worker.js), which keeps it and returns the visitor's promo code, or emails it to
+   them when it can. The code stays on this device for print pages. */
 const X_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/></svg>';
+const nlClosed=v=>{try{if(v)sessionStorage.setItem("jt-nl-closed","1");return !!sessionStorage.getItem("jt-nl-closed")}catch(e){return !!v}};
 function newsletter(){
-  const s=store("jt-nl")||{};
-  if(s.done||Date.now()-(s.closed||0)<7*86400000||location.hash.startsWith("#/poster-box")) return;
+  if((store("jt-nl")||{}).done||nlClosed()||location.hash.startsWith("#/poster-box")) return;
   setTimeout(openNewsletter,4000);
 }
 function openNewsletter(){
@@ -1252,7 +1253,7 @@ function openNewsletter(){
   const box=nl.querySelector(".nl-box"), body=nl.querySelector(".nl-body"), back=document.activeElement, overflow=document.body.style.overflow;
   let done=false;
   const close=()=>{
-    if(!done){store("jt-nl",{closed:Date.now()});stat("click",{x:"Newsletter closed"})}
+    if(!done){nlClosed(true);stat("click",{x:"Newsletter closed"})}
     nl.classList.remove("on");setTimeout(()=>nl.remove(),250);
     document.body.style.overflow=overflow;document.removeEventListener("keydown",key);back&&back.focus&&back.focus()};
   // Esc closes; Tab stays inside the pop-up
