@@ -206,6 +206,9 @@ footer a:hover{color:var(--ink)}
 .phead h1{font-size:clamp(30px,3.4vw,44px);margin-bottom:12px}
 .phead p{color:var(--muted);max-width:560px}
 .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:34px}
+/* All prints: under the collection filters, a line with the number of prints and the Sort menu
+   (the same header as "Currently on the wall" on the home page) */
+.sec-head .count{font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-style:normal;color:var(--muted)}
 .chip{font-family:var(--sans);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 13px;border:1px solid var(--line)}
 .chip[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:var(--btn)}
 
@@ -893,14 +896,17 @@ const WALL_SORTS=[
   {id:"place", label:"Place A–Z", sort:l=>l.sort(byText("place"))},
 ];
 const wallSort=()=>WALL_SORTS.find(s=>s.id===store("jt-wall-sort"))||WALL_SORTS[0];
-const wallPrints=()=>wallSort().sort([...PRINTS].reverse());
+// The prints in the chosen order (the sorts start from newest first, i.e. the sheet reversed)
+const sortPrints=(list=PRINTS)=>wallSort().sort([...list].reverse());
+const wallPrints=()=>sortPrints();
 const SORT_ICON='<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/></svg>';
 function sortMenu(){
   const cur=wallSort();
   return `<div class="sort"><button type="button" class="sort-btn" id="sortBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="sortMenu">${SORT_ICON}<span>Sort: <span id="sortLbl">${cur.label}</span></span></button>
     <div class="sort-menu" id="sortMenu" role="menu" aria-label="Sort prints" hidden>${WALL_SORTS.map(s=>`<button type="button" role="menuitemradio" aria-checked="${s===cur}" data-sort="${s.id}">${s.label}</button>`).join("")}</div></div>`;
 }
-function bindSortMenu(){
+// The same menu on the home page and All prints; the choice applies to both
+function bindSortMenu(prints=wallPrints){
   const btn=$("#sortBtn"), menu=$("#sortMenu"); if(!btn) return;
   const items=[...menu.querySelectorAll("[data-sort]")];
   const open=on=>{menu.hidden=!on;btn.setAttribute("aria-expanded",on);if(on)menu.querySelector('[aria-checked="true"]').focus()};
@@ -909,7 +915,7 @@ function bindSortMenu(){
     store("jt-wall-sort",b.dataset.sort);
     items.forEach(x=>x.setAttribute("aria-checked",x===b));
     $("#sortLbl").textContent=wallSort().label;
-    $("#wallGrid").innerHTML=wallPrints().map(card).join("");
+    $("#wallGrid").innerHTML=prints().map(card).join("");
     open(false);btn.focus();
   });
   menu.onkeydown=e=>{
@@ -959,16 +965,17 @@ function home(){
   ${PROCESS}`;
 }
 
-// filter: a collection slug, "newest" (every print, last sheet row first, as on the home page), or none
+// filter: a collection slug, or none for every print; the Sort menu orders them
+const shopPrints=filter=>sortPrints(filter&&filter!=="newest"?PRINTS.filter(p=>p.collections.includes(filter)):PRINTS); // "newest": an older link
 function shop(filter){
-  const list = filter==="newest"?[...PRINTS].reverse():filter?PRINTS.filter(p=>p.collections.includes(filter)):PRINTS;
+  if(filter==="newest") filter="";
   return `<div class="wrap"><div class="phead"><h1>All prints</h1><p>Every photograph is available in three sizes, as a canvas print alone or as a gallery wrapped canvas.</p></div>
   <div class="filters" role="group" aria-label="Filter by collection">
     <button class="chip" data-f="" aria-pressed="${!filter}">All</button>
-    <button class="chip" data-f="newest" aria-pressed="${filter==="newest"}">Newest to Oldest</button>
     ${COLLECTIONS.map(c=>`<button class="chip" data-f="${c.slug}" aria-pressed="${filter===c.slug}">${esc(c.name)}</button>`).join("")}
   </div>
-  <section class="block"><div class="grid4">${list.map(card).join("")}</div></section></div>`;
+  <div class="rule sec-head"><p class="count">${(n=>`${n} print${n===1?"":"s"}`)(shopPrints(filter).length)}</p>${sortMenu()}</div>
+  <section class="block"><div class="grid4" id="wallGrid">${shopPrints(filter).map(card).join("")}</div></section></div>`;
 }
 
 function collections(){
@@ -1168,7 +1175,10 @@ function bind(page,arg){
     bindSortMenu();
   }
   if(page==="poster-box") bindPosterTool();
-  if(page==="shop") document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{location.hash="#/shop"+(b.dataset.f?"/"+b.dataset.f:"")});
+  if(page==="shop"){
+    document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{location.hash="#/shop"+(b.dataset.f?"/"+b.dataset.f:"")});
+    bindSortMenu(()=>shopPrints(arg));
+  }
   if(page==="print"){
     const sb=$("#shareBtn");
     if(sb) sb.onclick=async()=>{
