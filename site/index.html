@@ -281,7 +281,12 @@ legend em{font-family:var(--serif);text-transform:none;letter-spacing:0;color:va
 .pnav a:hover{color:var(--ink)}
 .hint{font-size:13px;color:var(--muted);min-height:22px}
 dl.specs{margin-top:0}
-.finish-show{margin:-30px 0 70px}
+/* The selected finish's photo sits in the right column under the Finish choice; ordering and
+   the print's details come below, across the page (one column on phones) */
+.finish-show{margin:6px 0 0}
+.buybox{display:grid;grid-template-columns:1.25fr 1fr;gap:20px 56px;align-items:start;margin:-50px 0 70px;padding-top:26px;border-top:1px solid var(--line)}
+.buybox .btn.share{margin-bottom:0}
+@media (max-width:900px){.buybox{grid-template-columns:1fr;margin-top:-60px}}
 .finish-show img{display:block;width:100%;height:auto;cursor:zoom-in}
 .finish-show [hidden]{display:none}
 /* Transparent images: black lettering for the light theme, white for the dark */
@@ -1022,6 +1027,13 @@ function product(slug){
           <div class="custom-dims" id="customDims" hidden><label>Length (cm)<input type="number" name="cl" min="1" max="500" step="any" inputmode="decimal"></label><span class="x" aria-hidden="true">×</span><label>Width (cm)<input type="number" name="cw" min="1" max="500" step="any" inputmode="decimal"></label></div></fieldset>
         <fieldset><legend>Finish <em id="finLbl">Select</em></legend><div class="opts">
           ${FINISHES.map(f=>`<label><input type="radio" name="finish" value="${f.id}"${f.id===DEFAULT_FINISH?" checked":""}><span>${f.label}</span></label>`).join("")}</div></fieldset>
+      </form>
+      <section class="finish-show" aria-label="About the selected finish">${FINISHES.filter(f=>f.image).map(f=>`<div data-fin="${f.id}"${f.id===DEFAULT_FINISH?"":" hidden"}>${["l","d"].map(t=>`<img class="fin-${t}" src="${f.image}-${t==="l"?"light":"dark"}.webp" alt="${esc(f.label)}: details of the finish" loading="lazy">`).join("")}</div>`).join("")}</section>
+    </div>
+  </div>
+  <!-- Under the photos and the size/finish choice: ordering, then the print's details -->
+  <section class="buybox" id="buyBox" aria-label="Order this print">
+    <div>
         <div class="buyrow">
           <div class="qty"><button type="button" data-q="-1" aria-label="Decrease quantity">−</button><output id="qty">1</output><button type="button" data-q="1" aria-label="Increase quantity">+</button></div>
           <button type="button" class="btn" id="addCart">Add to cart</button>
@@ -1030,16 +1042,14 @@ function product(slug){
         <details class="promo" id="promoBox"${promoCode()?" open":""}><summary>Have a promo code?</summary>
           <div class="promo-in"><input id="promoIn" aria-label="Promo code" placeholder="Promo code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(promoCode())}"><button type="button" class="btn ghost" id="promoApply">Apply</button></div>
           <p class="hint" id="promoMsg" role="status"></p></details>
-      </form>
       <button type="button" class="btn ghost share" id="shareBtn" data-title="${esc(p.title)}" data-slug="${esc(p.slug)}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Share this print</button>
-      <dl class="specs">
-        ${p.coords?`<div><dt>Coordinates</dt><dd>${esc(p.coords)}</dd></div>`:""}
-        <div><dt>Availability</dt><dd>Made to order</dd></div>
-        <div><dt>Collections</dt><dd>${cols}</dd></div>
-      </dl>
     </div>
-  </div>
-  <section class="finish-show" aria-label="About the selected finish">${FINISHES.filter(f=>f.image).map(f=>`<div data-fin="${f.id}"${f.id===DEFAULT_FINISH?"":" hidden"}>${["l","d"].map(t=>`<img class="fin-${t}" src="${f.image}-${t==="l"?"light":"dark"}.webp" alt="${esc(f.label)}: details of the finish" loading="lazy">`).join("")}</div>`).join("")}</section>
+    <dl class="specs">
+      ${p.coords?`<div><dt>Coordinates</dt><dd>${esc(p.coords)}</dd></div>`:""}
+      <div><dt>Availability</dt><dd>Made to order</dd></div>
+      <div><dt>Collections</dt><dd>${cols}</dd></div>
+    </dl>
+  </section>
   ${related.length?`<section class="block"><div class="rule sec-head"><h2>Related work</h2></div><div class="grid4">${related.map(card).join("")}</div></section>`:""}
   </div>`;
 }
@@ -1220,7 +1230,7 @@ function bind(page,arg){
       pl.hidden=!code||cu; pl.textContent=off?`${promoPct()}% off with your code ${code}`:`Your code ${code} takes ${promoPct()}% off orders from ${money(promo().min)}`;
 $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show [data-fin]").forEach(d=>d.hidden=!fi||d.dataset.fin!==fi.id);$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
-    f.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
+    document.querySelectorAll("#buyBox [data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
     const p=PRINTS.find(x=>x.slug===arg);
     f.onsubmit=e=>e.preventDefault();
     // The same print, size and finish adds to the quantity already in the cart
