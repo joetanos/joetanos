@@ -1222,16 +1222,25 @@ function openViewer(imgs,start,onChange){
 }
 
 /* ---------- Newsletter pop-up ----------
-   Opens a few seconds into every visit until the visitor signs up. Closing it hides it for the
-   rest of the visit (sessionStorage, which ends when the tab is closed). The sign-up goes to
-   /subscribe (worker.js), which keeps it and returns the visitor's promo code, or emails it to
-   them when it can. The code stays on this device for print pages. */
+   Opens a few seconds into every visit until the visitor signs up. Closing it hides it until the
+   visitor has been away from the site for NL_AWAY, even in a tab left open (a phone coming back
+   to the site counts as a new visit then). The sign-up goes to /subscribe (worker.js), which keeps
+   it and returns the visitor's promo code, or emails it to them when it can. The code stays on
+   this device for print pages. */
 const X_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/></svg>';
-const nlClosed=v=>{try{if(v)sessionStorage.setItem("jt-nl-closed","1");return !!sessionStorage.getItem("jt-nl-closed")}catch(e){return !!v}};
+const NL_AWAY=30*60000;
+const nlHidden=()=>(store("jt-nl")||{}).done||store("jt-nl-closed")||location.hash.startsWith("#/poster-box");
+let nlTimer=0;
 function newsletter(){
-  if((store("jt-nl")||{}).done||nlClosed()||location.hash.startsWith("#/poster-box")) return;
-  setTimeout(openNewsletter,4000);
+  // Away long enough: a new visit, so a closed pop-up may open again
+  if(Date.now()-(store("jt-seen")||0)>=NL_AWAY) store("jt-nl-closed",null);
+  store("jt-seen",Date.now());
+  clearTimeout(nlTimer);
+  if(!nlHidden()) nlTimer=setTimeout(()=>{if(!nlHidden()&&document.visibilityState==="visible")openNewsletter()},4000);
 }
+// Leaving (another tab or app, closing, reloading) marks the time; coming back checks for a new visit
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")newsletter();else store("jt-seen",Date.now())});
+addEventListener("pagehide",()=>store("jt-seen",Date.now()));
 function openNewsletter(){
   if(document.querySelector(".nl")) return;
   const nl=document.createElement("div"); nl.className="nl";
@@ -1253,7 +1262,7 @@ function openNewsletter(){
   const box=nl.querySelector(".nl-box"), body=nl.querySelector(".nl-body"), back=document.activeElement, overflow=document.body.style.overflow;
   let done=false;
   const close=()=>{
-    if(!done){nlClosed(true);stat("click",{x:"Newsletter closed"})}
+    if(!done){store("jt-nl-closed",1);stat("click",{x:"Newsletter closed"})}
     nl.classList.remove("on");setTimeout(()=>nl.remove(),250);
     document.body.style.overflow=overflow;document.removeEventListener("keydown",key);back&&back.focus&&back.focus()};
   // Esc closes; Tab stays inside the pop-up
