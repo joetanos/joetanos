@@ -686,9 +686,9 @@ async function loadCatalog(){
     try{
       const url=CATALOG_URL+(CATALOG_URL.includes("?")?"&":"?")+"t="+Date.now();
       const text=await (await fetch(url,{cache:"no-store"})).text();
-      if(text===saved) return;
+      if(text===saved){pruneCart();return}
       // Redraw in place, keeping the visitor where they were on the page
-      if(useCatalog(text)){store("jt-catalog",text);if(shown){const y=scrollY;route();scrollTo(0,y)}}
+      if(useCatalog(text)){store("jt-catalog",text);pruneCart();if(shown){const y=scrollY;route();scrollTo(0,y)}}
     }catch(e){console.warn("Catalog could not be loaded, using the built-in prints instead.",e)}
   })();
   // A link to a print the saved copy doesn't have yet (e.g. just added to the sheet) waits for the sheet
@@ -714,16 +714,20 @@ const DEFAULT_SIZE = 1, DEFAULT_FINISH = "oak"; // preselected on every print pa
 const defSize = p=>Math.min(DEFAULT_SIZE,sizesFor(p).length-1);
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
 /* ---------- Cart ----------
-   Items are {slug, size, dims (custom sizes), finish, qty}, kept on the device. Prices come from
-   PRICE_TABLE each time, so they follow price changes. The cart is ordered on WhatsApp in one message. */
-let cart = (store("jt-cart") || []).filter(it=>it&&it.slug&&it.size&&it.finish&&it.qty>0);
+   Items are {slug, si (size position: 0 small, 1 medium… or "custom"), dims (custom sizes), finish, qty},
+   kept on the device. Sizes are kept by position, like PRICE_TABLE, so an item stays right while the
+   page switches from the built-in prints to the sheet's. Prices are worked out each time, so they
+   follow price changes. The cart is ordered on WhatsApp in one message. */
+let cart = (store("jt-cart") || []).filter(it=>it&&it.slug&&(Number.isInteger(it.si)||it.si==="custom")&&it.finish&&it.qty>0);
 const cartCount = ()=>cart.reduce((a,it)=>a+it.qty,0);
 function saveCart(){store("jt-cart",cart);const c=$("#cartCount");if(c){c.textContent=cartCount();c.hidden=!cart.length}}
-// An item with its print, size label and price; null if the print or size is no longer in the sheet.
+// Once the sheet is read: drop prints that are no longer in it
+function pruneCart(){const n=cart.length;cart=cart.filter(it=>PRINTS.some(p=>p.slug===it.slug));if(cart.length!==n)saveCart()}
+// An item with its print, size label and price; null if the print is no longer in the sheet.
 // unit is null for a custom size: the studio quotes it.
 function cartLine(it){
   const p=PRINTS.find(x=>x.slug===it.slug), fin=FINISHES.find(f=>f.id===it.finish); if(!p||!fin) return null;
-  const custom=it.size==="custom", sizes=sizesFor(p), si=sizes.findIndex(s=>s.id===it.size); if(!custom&&si<0) return null;
+  const custom=it.si==="custom", sizes=sizesFor(p), si=custom?0:Math.min(it.si,sizes.length-1);
   const unit=custom?null:priceOf(si,fin.id);
   return {...it,p,fin,sizeLabel:custom?(it.dims?`Custom, ${it.dims}`:"Custom"):sizes[si].label,unit,total:unit==null?null:unit*it.qty};
 }
@@ -1182,8 +1186,8 @@ $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.
     $("#addCart").onclick=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),h=$("#hint");
       if(!s||!fi){h.textContent="Choose a size and a finish first.";return}
       if(s.custom&&!dims()){h.textContent="Enter the length and width of your custom size first.";f.cl.focus();return}
-      const it={slug:p.slug,size:s.id,dims:s.custom?dims():"",finish:fi.id};
-      const same=cart.find(x=>x.slug===it.slug&&x.size===it.size&&(x.dims||"")===it.dims&&x.finish===it.finish);
+      const it={slug:p.slug,si:s.custom?"custom":SZ.indexOf(s),dims:s.custom?dims():"",finish:fi.id};
+      const same=cart.find(x=>x.slug===it.slug&&x.si===it.si&&(x.dims||"")===it.dims&&x.finish===it.finish);
       if(same) same.qty=Math.min(99,same.qty+qty); else cart.push({...it,qty});
       saveCart();
       h.innerHTML=`Added to your cart. <a href="#/cart">View cart (${cartCount()})</a>`};
