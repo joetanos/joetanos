@@ -298,6 +298,10 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
 .cart-row .right button{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .cart-foot{display:flex;justify-content:space-between;align-items:center;padding:26px 0 90px;gap:20px;flex-wrap:wrap}
 .cart-foot .total{font-family:var(--sans);font-size:18px}
+.cart-promo{padding:24px 0 0;max-width:460px;font-family:var(--sans);font-size:12.5px}
+.cart-promo label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.cart-promo .promo-in{margin-top:0}
+.cart-promo .hint{margin-top:8px;min-height:0}
 .cart-foot .note{color:var(--muted);font-size:14px}
 .cart-foot .promo-off{font-family:var(--sans);font-size:14px;color:var(--muted)}
 .cart-acts{display:flex;flex-direction:column;align-items:center;gap:14px}
@@ -1056,6 +1060,7 @@ function contact(){
   </form></div>`;
 }
 
+let cartPromoMsg=""; // a one-off message under the cart's promo field (e.g. an invalid code)
 function cartPage(){
   const lines=cartLines();
   if(!lines.length) return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div><div class="empty"><p>Your cart is empty. Choose a print, its size and finish, then press "Add to cart".</p><a class="btn" href="#/shop">Browse prints</a></div></div>`;
@@ -1068,6 +1073,9 @@ function cartPage(){
     <div><h3><a href="#/print/${l.p.slug}">${esc(l.p.title)}</a></h3><p class="meta">${esc(l.sizeLabel)}, ${esc(l.fin.label.toLowerCase())}</p>
       <div class="qty" style="display:inline-flex;margin-top:8px"><button data-cq="${i}" data-d="-1" aria-label="Decrease quantity">−</button><output>${it.qty}</output><button data-cq="${i}" data-d="1" aria-label="Increase quantity">+</button></div></div>
     <div class="right">${l.total==null?"Price on request":money(l.total)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
+  <div class="cart-promo"><label for="promoIn">Promo code</label>
+    <div class="promo-in"><input id="promoIn" placeholder="Enter your code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(promoCode())}"><button type="button" class="btn ghost" id="promoApply">Apply</button>${promoCode()?`<button type="button" class="btn ghost" id="promoRemove">Remove</button>`:""}</div>
+    <p class="hint" id="promoMsg" role="status">${esc(cartPromoMsg||(!promoCode()?"":off?`Code ${promoCode()} applied: ${promoPct()}% off.`:`Your code ${promoCode()} takes ${promoPct()}% off orders from ${money(promo().min)}.`))}</p></div>
   <div class="cart-foot"><div id="cartSum" data-d="${esc(summary)}"><p class="total">Subtotal ${money(sub)}</p>${off?`<p class="promo-off">${promoPct()}% off with code ${esc(promoCode())}: −${money(off)}</p><p class="total">Total ${money(sub-off)}</p>`:""}
     ${quote?`<p class="note">Custom sizes are priced by the studio when it replies.</p>`:""}<p class="note">Shipping is calculated when the studio confirms your order.</p></div>
   <div class="cart-acts"><a class="btn wa" id="checkout" href="${esc(waLink(cartMessage(lines)))}" target="_blank" rel="noopener">${WA_ICON}Order on WhatsApp</a><a class="small-link" href="#/shop">Continue shopping</a></div></div></div>`;
@@ -1222,7 +1230,17 @@ $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.
     upd();
   }
   if(page==="cart"){
-    const redraw=()=>{const y=scrollY;saveCart();route();scrollTo(0,y)};
+    const redraw=()=>{const y=scrollY;saveCart();route();scrollTo(0,y);cartPromoMsg=""};
+    const pin=$("#promoIn");
+    if(pin){
+      $("#promoApply").onclick=async()=>{const v=pin.value.trim().toUpperCase();
+        if(!v){store("jt-promo","");redraw();return}
+        $("#promoMsg").textContent="Checking…";
+        try{if(!await checkPromo(v)) cartPromoMsg="That code isn't valid."}catch(e){cartPromoMsg="Couldn't check the code. Please try again."}
+        redraw()};
+      pin.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#promoApply").click()}});
+      $("#promoRemove")?.addEventListener("click",()=>{store("jt-promo","");redraw()});
+    }
     document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.rm,1);redraw()});
     document.querySelectorAll("[data-cq]").forEach(b=>b.onclick=()=>{const it=cart[+b.dataset.cq];it.qty=Math.max(1,Math.min(99,it.qty+ +b.dataset.d));redraw()});
   }
