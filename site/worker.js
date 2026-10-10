@@ -30,6 +30,7 @@ export default {
     if (url.pathname === "/report-now") return reportNow(request, env);
     if (url.pathname === "/subscribe") return subscribe(request, url, env, ctx);
     if (url.pathname === "/promo") return promo(url, env);
+    if (url.pathname === "/catalog.csv") return catalogFeed(url, env);
     const m = url.pathname.match(/^\/p\/([^/]+)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
@@ -617,6 +618,40 @@ function mime({ from, to, subject, text, html, attachment }) {
       "Content-Transfer-Encoding: base64", "", b64(attachment.body)] : []),
     `--${mixed}--`, "",
   ].join("\r\n");
+}
+
+/* /catalog.csv: every print shown on the site, as a product list Meta's Commerce Manager reads on a
+   schedule for the WhatsApp Business catalog. One product per print, priced like the site's cards
+   (the default size and finish), with every size and finish price in the description.
+   Keep these in sync with SIZES, FINISHES, PRICE_TABLE and DEFAULT_SIZE/DEFAULT_FINISH in index.html. */
+const FEED_SIZES = ["30 × 40 cm", "50 × 70 cm", "70 × 100 cm"];
+const FEED_FINISHES = { print: "Canvas Print Only", oak: "Gallery Wrapped Canvas" };
+const FEED_PRICES = [{ print: 20, oak: 35 }, { print: 30, oak: 55 }, { print: 45, oak: 85 }];
+const FEED_DEFAULT = { size: 1, finish: "oak" };
+
+async function catalogFeed(url, env) {
+  const prints = await catalog(env, url);
+  const abs = u => new URL(u, SITE).href;
+  const price = (i, f) => (FEED_PRICES[i] || FEED_PRICES[FEED_PRICES.length - 1])[f];
+  const rows = prints.map(p => {
+    // Sizes from the sheet ("30 × 45 cm = 60 | …"; the numbers there aren't used), else the defaults
+    const sizes = (p.sizes || "").split(/\||\n/).map(x => x.trim().match(/^(.*?)[=:]\s*\$?\s*[\d.]+\s*$/)?.[1].trim()).filter(Boolean);
+    const labels = sizes.length ? sizes : FEED_SIZES;
+    const images = (p.images || p.image || p.photos || "").split(/\||\n|\s+(?=https?:)/).map(x => x.trim()).filter(Boolean).map(abs);
+    const list = labels.map((l, i) => `${l}: ${Object.entries(FEED_FINISHES).map(([f, name]) => `$${price(i, f)} ${name.toLowerCase()}`).join(", ")}`).join("; ");
+    const where = [p.place || p.location, p.year].filter(Boolean).join(", ");
+    return {
+      id: p.slug, title: p.title.replace(/\.$/, "").slice(0, 200),
+      description: [p.description || p.desc, where && `Photographed in ${where}.`, `Sizes and prices: ${list}. Custom sizes on request.`].filter(Boolean).join(" ").slice(0, 9000),
+      availability: "in stock", condition: "new", price: `${price(Math.min(FEED_DEFAULT.size, labels.length - 1), FEED_DEFAULT.finish).toFixed(2)} USD`,
+      link: `${SITE}/p/${encodeURIComponent(p.slug)}`, image_link: images[0] || "", additional_image_link: images.slice(1, 10).join(","),
+      brand: "Just Framed",
+    };
+  }).filter(r => r.image_link);
+  const cols = ["id", "title", "description", "availability", "condition", "price", "link", "image_link", "additional_image_link", "brand"];
+  const cell = v => /[",\n\r]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
+  const csv = [cols.join(","), ...rows.map(r => cols.map(c => cell(r[c] ?? "")).join(","))].join("\n");
+  return new Response(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Cache-Control": "public, max-age=900" } });
 }
 
 async function findPrint(slug, url, env) {
