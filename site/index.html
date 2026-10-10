@@ -959,11 +959,13 @@ function home(){
   ${PROCESS}`;
 }
 
+// filter: a collection slug, "newest" (every print, last sheet row first, as on the home page), or none
 function shop(filter){
-  const list = filter?PRINTS.filter(p=>p.collections.includes(filter)):PRINTS;
+  const list = filter==="newest"?[...PRINTS].reverse():filter?PRINTS.filter(p=>p.collections.includes(filter)):PRINTS;
   return `<div class="wrap"><div class="phead"><h1>All prints</h1><p>Every photograph is available in three sizes, as a canvas print alone or as a gallery wrapped canvas.</p></div>
   <div class="filters" role="group" aria-label="Filter by collection">
     <button class="chip" data-f="" aria-pressed="${!filter}">All</button>
+    <button class="chip" data-f="newest" aria-pressed="${filter==="newest"}">Newest to Oldest</button>
     ${COLLECTIONS.map(c=>`<button class="chip" data-f="${c.slug}" aria-pressed="${filter===c.slug}">${esc(c.name)}</button>`).join("")}
   </div>
   <section class="block"><div class="grid4">${list.map(card).join("")}</div></section></div>`;
