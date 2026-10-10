@@ -11,3 +11,4 @@ package-lock.json
 worker.js
 .wrangler
 **/.wrangler
+xlsx.js
