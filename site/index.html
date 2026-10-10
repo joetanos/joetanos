@@ -302,9 +302,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
 .cart-acts{display:flex;flex-direction:column;align-items:center;gap:14px}
 .cart-acts .btn.wa{padding:16px 26px}
 .cart-row h3 a:hover{text-decoration:underline}
-.hint a{color:var(--ink);text-decoration:underline}
-.btn.wa.full{display:flex;margin-bottom:10px}
-.empty{padding:20px 0 100px;color:var(--muted)}
+.hint a{color:var(--ink);text-decoration:underline}.empty{padding:20px 0 100px;color:var(--muted)}
 .empty .btn{margin-top:20px}
 
 /* Forms */
@@ -985,9 +983,8 @@ function product(slug){
           ${FINISHES.map(f=>`<label><input type="radio" name="finish" value="${f.id}"${f.id===DEFAULT_FINISH?" checked":""}><span>${f.label}</span></label>`).join("")}</div></fieldset>
         <div class="buyrow">
           <div class="qty"><button type="button" data-q="-1" aria-label="Decrease quantity">−</button><output id="qty">1</output><button type="button" data-q="1" aria-label="Increase quantity">+</button></div>
-          <button type="button" class="btn ghost" id="addCart">Add to cart</button>
+          <button type="button" class="btn" id="addCart">Add to cart</button>
         </div>
-        <a class="btn wa full" id="waBtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2Z"/></svg>Contact on WhatsApp</a>
         <p class="hint" id="hint"></p>
         <details class="promo" id="promoBox"${promoCode()?" open":""}><summary>Have a promo code?</summary>
           <div class="promo-in"><input id="promoIn" aria-label="Promo code" placeholder="Promo code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(promoCode())}"><button type="button" class="btn ghost" id="promoApply">Apply</button></div>
@@ -1173,14 +1170,7 @@ function bind(page,arg){
 $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show [data-fin]").forEach(d=>d.hidden=!fi||d.dataset.fin!==fi.id);$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
     f.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
-    const p=PRINTS.find(x=>x.slug===arg), wa=$("#waBtn");
-    const waUpd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
-      let msg=`Hello, I'm interested in the print "${p.title}"${whereText(p)?` (${whereText(p)})`:""}.`;
-      if(s||fi) msg+=`\n\nSize: ${s?sizeText(s):"not chosen yet"}\nFinish: ${fi?fi.label:"not chosen yet"}\nQuantity: ${qty}${cu?"":`\nPrice shown: ${money(price()*qty)}`}${!cu&&promoOff(price()*qty)?`\nPromo code ${promoCode()} (${PROMO.percent}% off): ${money(price()*qty-promoOff(price()*qty))}`:""}`;
-      msg+=`\n\n${printLink(p.slug)}`;
-      wa.href=waLink(msg);};
-    f.addEventListener("change",waUpd);f.addEventListener("input",waUpd);
-    f.querySelectorAll("[data-q]").forEach(b=>b.addEventListener("click",waUpd));
+    const p=PRINTS.find(x=>x.slug===arg);
     f.onsubmit=e=>e.preventDefault();
     // The same print, size and finish adds to the quantity already in the cart
     $("#addCart").onclick=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),h=$("#hint");
@@ -1193,12 +1183,12 @@ $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.
       h.innerHTML=`Added to your cart. <a href="#/cart">View cart (${cartCount()})</a>`};
     const pin=$("#promoIn"), pmsg=$("#promoMsg");
     $("#promoApply").onclick=async()=>{const v=pin.value.trim().toUpperCase();
-      if(!v){store("jt-promo","");pmsg.textContent="";upd();waUpd();return}
+      if(!v){store("jt-promo","");pmsg.textContent="";upd();return}
       pmsg.textContent="Checking…";
       try{pmsg.textContent=await checkPromo(v)?"Code applied.":"That code isn't valid."}catch(e){pmsg.textContent="Couldn't check the code. Please try again."}
-      upd();waUpd()};
+      upd()};
     pin.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#promoApply").click()}});
-    upd();waUpd();
+    upd();
   }
   if(page==="cart"){
     const redraw=()=>{const y=scrollY;saveCart();route();scrollTo(0,y)};
@@ -1427,8 +1417,7 @@ document.addEventListener("click",e=>{
   const {pg,i}=statPage(), hrefSlug=h=>(h.match(/#\/(?:print|collection)\/([^/?#]+)/)||[])[1];
   const href=el.getAttribute("href")||"";
   let x=null, item=i, d;
-  if(el.id==="waBtn"){x="WhatsApp order";d=["#sizeLbl","#finLbl","#qty","#amount","#promoLine"].map(s=>$(s)&&!$(s).hidden?$(s).textContent.trim():"").filter(Boolean).join(" | ")}
-  else if(el.matches("[data-wa]")) x="WhatsApp";
+  if(el.matches("[data-wa]")) x="WhatsApp";
   else if(el.matches("[data-ig]")) x="Instagram";
   else if(href.includes("facebook.com")) x="Facebook";
   else if(href.startsWith("mailto:")) x="Email";
