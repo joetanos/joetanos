@@ -27,3 +27,15 @@ CREATE TABLE IF NOT EXISTS subscribers (
   emailed INTEGER DEFAULT 0,    -- 1 once the code was emailed to them
   country TEXT, city TEXT, lang TEXT
 );
+
+-- The studio's own promo codes (worker.js /promo). Usable any number of times while active = 1.
+-- Add one:     INSERT INTO promo_codes (code, percent, min, note, created) VALUES ('NAME20-XXXX', 20, 0, 'what it is for', strftime('%s','now') * 1000);
+-- Turn it off: UPDATE promo_codes SET active = 0 WHERE code = 'NAME20-XXXX';
+CREATE TABLE IF NOT EXISTS promo_codes (
+  code TEXT PRIMARY KEY,   -- in capitals, e.g. JUST20-K7QM
+  percent INTEGER NOT NULL, -- discount, e.g. 20 for 20% off
+  min REAL DEFAULT 0,      -- smallest order (subtotal in $) it works on; 0 for any order
+  active INTEGER DEFAULT 1, -- 0 turns the code off
+  note TEXT,               -- what the code is for
+  created INTEGER          -- ms since 1970 (UTC)
+);

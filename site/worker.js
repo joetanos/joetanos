@@ -196,10 +196,15 @@ async function subscribe(request, url, env, ctx) {
   return json({ ok: true, kind: sub.kind, again, emailed, code: emailed ? null : sub.code, ...PROMO });
 }
 
+// A subscriber's code, or one of the studio's own codes (promo_codes table: any percent, any
+// minimum, usable any number of times while active is 1)
 async function promo(url, env) {
-  const code = (url.searchParams.get("code") || "").trim().toUpperCase().slice(0, 20);
-  const row = code && env.DB ? await env.DB.prepare("SELECT code FROM subscribers WHERE code = ?").bind(code).first() : null;
-  return json(row ? { ok: true, code: row.code, percent: PROMO.percent, min: PROMO.min } : { ok: false });
+  const code = (url.searchParams.get("code") || "").trim().toUpperCase().slice(0, 30);
+  if (!code || !env.DB) return json({ ok: false });
+  const sub = await env.DB.prepare("SELECT code FROM subscribers WHERE code = ?").bind(code).first();
+  if (sub) return json({ ok: true, code: sub.code, percent: PROMO.percent, min: PROMO.min });
+  const own = await env.DB.prepare("SELECT code, percent, min FROM promo_codes WHERE code = ? AND active = 1").bind(code).first().catch(() => null);
+  return json(own ? { ok: true, code: own.code, percent: own.percent, min: own.min || 0 } : { ok: false });
 }
 
 // An email address (lowercased) or a phone number as +<country><number>; numbers without a
@@ -297,7 +302,8 @@ async function dailyReport(env, now, test, days = 1) {
 
   // Newsletter subscribers, and WhatsApp orders that carried a promo code (the code is in the order detail)
   const { results: subs } = await env.DB.prepare("SELECT * FROM subscribers ORDER BY ts DESC").all().catch(() => ({ results: [] }));
-  const { results: coded } = await env.DB.prepare("SELECT detail FROM events WHERE target IN ('WhatsApp order', 'Cart order') AND detail LIKE ?").bind(`%${PROMO.prefix}%`).all();
+  const { results: coded } = await env.DB.prepare("SELECT ts, detail FROM events WHERE target IN ('WhatsApp order', 'Cart order') AND detail LIKE '%code %'").all();
+  const { results: ownCodes } = await env.DB.prepare("SELECT * FROM promo_codes ORDER BY percent, code").all().catch(() => ({ results: [] }));
   const newSubs = subs.filter(s => s.ts >= start && s.ts < end);
   const signups = [newSubs.length, subs.filter(s => s.ts >= start - 7 * days * DAY && s.ts < start).length];
   const day = ev.filter(e => e.ts >= start), before = ev.filter(e => e.ts < start);
@@ -364,6 +370,7 @@ ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choos
   const book = await xlsx({ sheets: [
     statisticsSheet({ day, before, back, shop, name, country, signups, heading: `${dateText} · ${period}, until ${timeOf(end)}`, avgLabel }),
     subscribersSheet(subs, coded, country),
+    promoCodesSheet(ownCodes, coded, start),
     eventsSheet(day, name),
   ] });
 
@@ -535,6 +542,15 @@ function statisticsSheet({ day, before, back, shop, name, country, signups, head
 }
 
 // Everyone on the newsletter, newest first
+// The studio's own codes and how often each was in an order sent on WhatsApp
+function promoCodesSheet(codes, coded, start) {
+  const head = ["Promo code", "Discount", "Minimum order ($)", "Active", "Orders with the code (this period)", "Orders with the code (all time)", "Note"];
+  const orders = (code, from = 0) => coded.filter(e => e.ts >= from && (e.detail || "").includes(code)).length;
+  return { name: "Promo codes", freeze: 1, cols: [20, 10, 17, 8, 18, 18, 40],
+    rows: [head.map(h => ({ v: h, s: "head" })), ...codes.map(c => [c.code, c.percent / 100, c.min || 0, c.active ? "Yes" : "No",
+      orders(c.code, start), orders(c.code), c.note || ""].map((v, i) => i === 1 ? { v, s: "pct" } : v))] };
+}
+
 function subscribersSheet(subs, coded, country) {
   const head = ["Signed up (Beirut)", "Email or phone", "Type", "Promo code", "Code emailed", "WhatsApp orders with the code", "Country", "City", "Language"];
   const used = code => coded.filter(e => (e.detail || "").includes(code)).length;

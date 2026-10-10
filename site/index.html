@@ -737,18 +737,22 @@ function cartMessage(lines){
   return "Hello, I'd like to order these prints:\n\n"
     +lines.map((l,k)=>`${k+1}. ${l.p.title}${whereText(l.p)?` (${whereText(l.p)})`:""}\nSize: ${l.sizeLabel}\nFinish: ${l.fin.label}\nQuantity: ${l.qty}\nPrice: ${l.total==null?"to be confirmed (custom size)":money(l.total)}\n${printLink(l.p.slug)}`).join("\n\n")
     +`\n\nSubtotal: ${money(sub)}${quote?" + custom sizes":""}`
-    +(off?`\nPromo code ${promoCode()} (${PROMO.percent}% off): ${money(sub-off)}`:"");
+    +(off?`\nPromo code ${promoCode()} (${promoPct()}% off): ${money(sub-off)}`:"");
 }
 /* ---------- Promo code ----------
    Newsletter subscribers get a personal code (newsletter pop-up below, /subscribe in worker.js) for
-   PROMO.percent off a first order from $PROMO.min. Keep in sync with PROMO in worker.js. */
+   PROMO.percent off a first order from $PROMO.min. Keep in sync with PROMO in worker.js.
+   The studio's own codes (promo_codes table) have their own percent and minimum; /promo returns them.
+   The code in use is kept on the device as {code, percent, min} (a plain string is a newsletter code). */
 const PROMO={percent:10,min:50};
-const promoCode=()=>store("jt-promo")||"";
-const promoOff=total=>promoCode()&&total>=PROMO.min?Math.round(total*PROMO.percent)/100:0;
+const promo=()=>{const p=store("jt-promo");return !p?null:typeof p==="string"?{code:p,percent:PROMO.percent,min:PROMO.min}:p};
+const promoCode=()=>promo()?.code||"";
+const promoPct=()=>promo()?.percent||0;
+const promoOff=total=>{const p=promo();return p&&total>=p.min?Math.round(total*p.percent)/100:0};
 // Checks a typed code with the studio's list and keeps it on this device if it's valid
 async function checkPromo(code){
   const j=await (await fetch("/promo?code="+encodeURIComponent(code))).json();
-  if(j.ok) store("jt-promo",j.code);
+  if(j.ok) store("jt-promo",{code:j.code,percent:j.percent,min:j.min});
   return j.ok?j.code:null;
 }
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2400)}
@@ -1035,14 +1039,14 @@ function cartPage(){
   if(!lines.length) return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div><div class="empty"><p>Your cart is empty. Choose a print, its size and finish, then press "Add to cart".</p><a class="btn" href="#/shop">Browse prints</a></div></div>`;
   const sub=cartSubtotal(lines), off=promoOff(sub), quote=lines.some(l=>l.unit==null);
   // What the visit statistics record for the order click (the promo code lets the report count codes used)
-  const summary=lines.map(l=>`${l.qty} × ${l.p.title} (${l.sizeLabel}, ${l.fin.label})`).join("; ")+` | Subtotal ${money(sub)}`+(off?` | ${PROMO.percent}% off with your code ${promoCode()}: ${money(sub-off)}`:"");
+  const summary=lines.map(l=>`${l.qty} × ${l.p.title} (${l.sizeLabel}, ${l.fin.label})`).join("; ")+` | Subtotal ${money(sub)}`+(off?` | ${promoPct()}% off with your code ${promoCode()}: ${money(sub-off)}`:"");
   return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div>
   ${cart.map((it,i)=>{const l=cartLine(it);if(!l)return "";const im=printImages(l.p);
     return `<div class="cart-row"><a href="#/print/${l.p.slug}" class="ph"><img src="${sized(im[0].src,150)}" alt=""></a>
     <div><h3><a href="#/print/${l.p.slug}">${esc(l.p.title)}</a></h3><p class="meta">${esc(l.sizeLabel)}, ${esc(l.fin.label.toLowerCase())}</p>
       <div class="qty" style="display:inline-flex;margin-top:8px"><button data-cq="${i}" data-d="-1" aria-label="Decrease quantity">−</button><output>${it.qty}</output><button data-cq="${i}" data-d="1" aria-label="Increase quantity">+</button></div></div>
     <div class="right">${l.total==null?"Price on request":money(l.total)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
-  <div class="cart-foot"><div id="cartSum" data-d="${esc(summary)}"><p class="total">Subtotal ${money(sub)}</p>${off?`<p class="promo-off">${PROMO.percent}% off with code ${esc(promoCode())}: −${money(off)}</p><p class="total">Total ${money(sub-off)}</p>`:""}
+  <div class="cart-foot"><div id="cartSum" data-d="${esc(summary)}"><p class="total">Subtotal ${money(sub)}</p>${off?`<p class="promo-off">${promoPct()}% off with code ${esc(promoCode())}: −${money(off)}</p><p class="total">Total ${money(sub-off)}</p>`:""}
     ${quote?`<p class="note">Custom sizes are priced by the studio when it replies.</p>`:""}<p class="note">Shipping is calculated when the studio confirms your order.</p></div>
   <div class="cart-acts"><a class="btn wa" id="checkout" href="${esc(waLink(cartMessage(lines)))}" target="_blank" rel="noopener">${WA_ICON}Order on WhatsApp</a><a class="small-link" href="#/shop">Continue shopping</a></div></div></div>`;
 }
@@ -1168,7 +1172,7 @@ function bind(page,arg){
       $("#customDims").hidden=!cu;$("#amount").hidden=cu;
       const total=price()*qty, off=cu?0:promoOff(total), code=promoCode(), pl=$("#promoLine");
       $("#amount").innerHTML=off?`<s>${money(total)}</s> ${money(total-off)}`:money(total);
-      pl.hidden=!code||cu; pl.textContent=off?`${PROMO.percent}% off with your code ${code}`:`Your code ${code} takes ${PROMO.percent}% off orders from ${money(PROMO.min)}`;
+      pl.hidden=!code||cu; pl.textContent=off?`${promoPct()}% off with your code ${code}`:`Your code ${code} takes ${promoPct()}% off orders from ${money(promo().min)}`;
 $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show [data-fin]").forEach(d=>d.hidden=!fi||d.dataset.fin!==fi.id);$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
     f.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
@@ -1331,7 +1335,7 @@ function openNewsletter(){
       const r=await fetch("/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({c,hp:form.hp.value})});
       const j=await r.json().catch(()=>({}));
       if(!r.ok||!j.ok) throw new Error(j.error||"Sign-up didn't go through. Please try again.");
-      done=true; store("jt-nl",{done:1}); if(j.code) store("jt-promo",j.code);
+      done=true; store("jt-nl",{done:1}); if(j.code) store("jt-promo",{code:j.code,percent:j.percent,min:j.min});
       stat("click",{x:"Newsletter sign-up"});
       thanks(j,c);
     }catch(x){err.textContent=x instanceof TypeError?"No connection. Please try again.":x.message;btn.disabled=false;btn.textContent="Subscribe"}
