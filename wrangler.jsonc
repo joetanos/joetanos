@@ -26,6 +26,11 @@
     {
       "name": "MAILER",
       "destination_address": "justframed-lb@outlook.com"
+    },
+    // Promo code emails to newsletter subscribers (see subscribe in worker.js). Reaches any address
+    // only once Email Sending is turned on for justframed-lb.com in the Cloudflare dashboard.
+    {
+      "name": "EMAIL"
     }
   ]
 }

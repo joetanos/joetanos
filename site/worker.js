@@ -6,6 +6,7 @@
    /img?u=<photo link>&w=<width> serves a smaller, cached copy of a photo (see sized() in index.html).
    /t saves visit statistics sent by the page to the D1 database (see analytics/);
    a summary of them is emailed every evening (dailyReport).
+   /subscribe signs a visitor up to the newsletter and gives them a promo code; /promo checks a code.
    Every other request is served from the static files untouched. */
 
 import { EmailMessage } from "cloudflare:email";
@@ -27,6 +28,8 @@ export default {
     if (url.pathname === "/img") return resized(request, url, env, ctx);
     if (url.pathname === "/t") return track(request, url, env, ctx);
     if (url.pathname === "/report-now") return reportNow(request, env);
+    if (url.pathname === "/subscribe") return subscribe(request, url, env, ctx);
+    if (url.pathname === "/promo") return promo(url, env);
     const m = url.pathname.match(/^\/p\/([^/]+)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
@@ -145,6 +148,118 @@ function uaInfo(ua) {
   return [device, browser, os];
 }
 
+/* ---------- Newsletter ----------
+   The pop-up in index.html sends {c: email or phone number, hp: hidden field bots fill in}.
+   Each subscriber gets a personal code for PROMO.percent off a first order from $PROMO.min,
+   kept in the subscribers table (analytics/schema.sql). The code is emailed to email sign-ups
+   when Cloudflare Email Sending is on for the domain (binding EMAIL); otherwise, and for phone
+   numbers, the page shows it. The studio gets an email for every sign-up, with a WhatsApp link
+   that sends the code to phone sign-ups in one tap. */
+const PROMO = { percent: 10, min: 50, prefix: "JF10-" }; // keep percent and min in sync with PROMO in index.html
+const NEWS_FROM = "newsletter@justframed-lb.com";
+const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+
+async function subscribe(request, url, env, ctx) {
+  if (request.method !== "POST" || !env.DB) return json({ error: "Sign-up isn't available right now." }, 405);
+  const origin = request.headers.get("Origin");
+  if (origin && origin !== url.origin) return json({ error: "Not allowed" }, 403);
+  let body;
+  try { body = JSON.parse((await request.text()).slice(0, 2000)) } catch (e) { return json({ error: "Bad request" }, 400) }
+  if (body.hp) return json({ ok: true });
+  const contact = cleanContact(body.c);
+  if (!contact) return json({ error: "Please enter a valid email address or phone number." }, 400);
+
+  let sub = await env.DB.prepare("SELECT * FROM subscribers WHERE contact = ?").bind(contact.value).first();
+  const again = !!sub;
+  if (!sub) {
+    // A guard against a script signing up thousands of addresses
+    const { n } = await env.DB.prepare("SELECT COUNT(*) n FROM subscribers WHERE ts > ?").bind(Date.now() - DAY).first();
+    if (n >= 500) return json({ error: "Too many sign-ups today. Please try again tomorrow." }, 429);
+    const cf = request.cf || {};
+    for (let i = 0; i < 3 && !sub; i++) {
+      sub = { ts: Date.now(), contact: contact.value, kind: contact.kind, code: newCode(), emailed: 0,
+        country: cf.country || null, city: cf.city || null, lang: request.headers.get("Accept-Language")?.split(/[,;]/)[0].slice(0, 20) || null };
+      try {
+        await env.DB.prepare("INSERT INTO subscribers (ts, contact, kind, code, emailed, country, city, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(sub.ts, sub.contact, sub.kind, sub.code, 0, sub.country, sub.city, sub.lang).run();
+      } catch (e) {
+        // Same code drawn twice (retry), or the same person signing up twice at once
+        sub = await env.DB.prepare("SELECT * FROM subscribers WHERE contact = ?").bind(contact.value).first();
+      }
+    }
+    if (!sub) return json({ error: "Sign-up didn't go through. Please try again." }, 500);
+  }
+  const emailed = sub.kind === "email" && await sendCode(env, sub.contact, sub.code);
+  if (emailed) ctx.waitUntil(env.DB.prepare("UPDATE subscribers SET emailed = 1 WHERE contact = ?").bind(sub.contact).run());
+  if (!again) ctx.waitUntil(notifyStudio(env, sub, emailed).catch(e => console.error("Sign-up email to the studio not sent", e)));
+  // When the code went by email it isn't shown, so only the owner of the address gets it
+  return json({ ok: true, kind: sub.kind, again, emailed, code: emailed ? null : sub.code, ...PROMO });
+}
+
+async function promo(url, env) {
+  const code = (url.searchParams.get("code") || "").trim().toUpperCase().slice(0, 20);
+  const row = code && env.DB ? await env.DB.prepare("SELECT code FROM subscribers WHERE code = ?").bind(code).first() : null;
+  return json(row ? { ok: true, code: row.code, percent: PROMO.percent, min: PROMO.min } : { ok: false });
+}
+
+// An email address (lowercased) or a phone number as +<country><number>; numbers without a
+// country code are taken as Lebanese (03 123 456, 71 123 456)
+function cleanContact(v) {
+  const s = String(v || "").trim().slice(0, 120);
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s)) return { kind: "email", value: s.toLowerCase() };
+  let d = s.replace(/[\s().-]/g, "");
+  if (!/^\+?\d+$/.test(d)) return null;
+  if (d.startsWith("00")) d = "+" + d.slice(2);
+  if (!d.startsWith("+")) { d = d.replace(/^0/, ""); d = d.length <= 8 ? "+961" + d : "+" + d }
+  return d.length >= 9 && d.length <= 16 ? { kind: "phone", value: d } : null;
+}
+
+function newCode() {
+  const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O or 1/I
+  return PROMO.prefix + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => abc[b % abc.length]).join("");
+}
+
+const promoText = code => `Your code ${code} takes ${PROMO.percent}% off your first order of $${PROMO.min} or more. Enter it on any print page, or mention it when you order on WhatsApp.`;
+
+async function sendCode(env, to, code) {
+  if (!env.EMAIL) return false;
+  const html = `<!doctype html><html><body style="margin:0;background:#f5f2ed;font-family:Georgia,'Times New Roman',serif;color:#1c1b18">
+<div style="max-width:520px;margin:0 auto;padding:36px 24px;background:#fff">
+<p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#807a70;margin:0 0 12px">Just Framed newsletter</p>
+<h1 style="font-size:28px;font-weight:normal;margin:0 0 14px">Thank you for subscribing</h1>
+<p style="font-size:16px;line-height:1.6;color:#57534b;margin:0 0 22px">Here is your code for ${PROMO.percent}% off your first order of $${PROMO.min} or more:</p>
+<p style="font-family:Helvetica,Arial,sans-serif;font-size:24px;letter-spacing:4px;text-align:center;border:1px dashed #ddd7cd;padding:16px;margin:0 0 22px">${code}</p>
+<p style="font-size:16px;line-height:1.6;color:#57534b;margin:0 0 26px">Enter it on any print page, or mention it when you order on WhatsApp. You'll also hear from us first about new prints, discounts and packages.</p>
+<a href="${SITE}/#/shop" style="display:inline-block;background:#1c1b18;color:#f5f2ed;font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:13px 20px;text-decoration:none">Browse the prints</a>
+<p style="font-size:13px;color:#807a70;margin:30px 0 0">To unsubscribe, just reply to this email.</p>
+</div></body></html>`;
+  try {
+    await env.EMAIL.send({ to, from: { email: NEWS_FROM, name: "Just Framed" }, replyTo: REPORT_TO,
+      subject: `Your ${PROMO.percent}% off code: ${code}`, html, text: `Thank you for subscribing to the Just Framed newsletter.\n\n${promoText(code)}\n\n${SITE}/#/shop\n\nTo unsubscribe, just reply to this email.` });
+    return true;
+  } catch (e) {
+    console.error("Promo code email not sent", e.code || "", e.message);
+    return false;
+  }
+}
+
+async function notifyStudio(env, sub, emailed) {
+  const where = [sub.city, sub.country].filter(Boolean).join(", ");
+  const msg = `Hello from Just Framed! Thank you for subscribing to our newsletter. ${promoText(sub.code)}`;
+  const link = sub.kind === "phone" ? `https://wa.me/${sub.contact.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
+  const how = sub.kind === "phone" ? "The code was shown on the website. Send it on WhatsApp too:" : emailed ? "The code was emailed to them." : "The code was shown on the website (Email Sending isn't on, so it wasn't emailed).";
+  const html = `<!doctype html><html><body style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#1c1b18">
+<h2 style="font-size:18px;margin:0 0 12px">New newsletter subscriber</h2>
+<p style="margin:0 0 6px"><b>${esc(sub.contact)}</b>${where ? ` · ${esc(where)}` : ""}</p>
+<p style="margin:0 0 16px">Promo code: <b>${sub.code}</b> (${PROMO.percent}% off a first order from $${PROMO.min})</p>
+<p style="margin:0 0 10px">${how}</p>
+${link ? `<p><a href="${esc(link)}" style="display:inline-block;background:#1f9d55;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Send the code on WhatsApp</a></p>` : ""}
+</body></html>`;
+  const text = `New newsletter subscriber: ${sub.contact}${where ? ` (${where})` : ""}\nPromo code: ${sub.code}\n${how}${link ? "\n" + link : ""}`;
+  const raw = mime({ from: `Just Framed website <${REPORT_FROM}>`, to: REPORT_TO, subject: `New subscriber: ${sub.contact}`, text, html });
+  await env.MAILER.send(new EmailMessage(REPORT_FROM, REPORT_TO, raw));
+}
+
 /* ---------- Daily report email ----------
    Covers the 24 hours up to 22:00, compared with the average of the 7 days before. The address
    must be verified in Cloudflare Email Routing; it's set in wrangler.jsonc (send_email). */
@@ -180,6 +295,11 @@ async function dailyReport(env, now, test, days = 1) {
   for (const r of shop) titles[r.slug] = r.title.replace(/\.$/, "");
   const name = slug => titles[slug] || String(slug || "?").replace(/-/g, " ");
 
+  // Newsletter subscribers, and WhatsApp orders that carried a promo code (the code is in the order detail)
+  const { results: subs } = await env.DB.prepare("SELECT * FROM subscribers ORDER BY ts DESC").all().catch(() => ({ results: [] }));
+  const { results: coded } = await env.DB.prepare("SELECT detail FROM events WHERE target = 'WhatsApp order' AND detail LIKE ?").bind(`%${PROMO.prefix}%`).all();
+  const newSubs = subs.filter(s => s.ts >= start && s.ts < end);
+  const signups = [newSubs.length, subs.filter(s => s.ts >= start - 7 * days * DAY && s.ts < start).length];
   const day = ev.filter(e => e.ts >= start), before = ev.filter(e => e.ts < start);
   const stats = list => {
     const visits = new Set(list.filter(e => e.type === "view").map(e => e.sid));
@@ -226,6 +346,7 @@ async function dailyReport(env, now, test, days = 1) {
 <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 -6px"><tr>
 ${tile("Visitors", today.visitors, prev.visitors)}${tile("Visits", today.visits, prev.visits)}${tile("Page views", today.views, prev.views)}${tile("WhatsApp orders", today.orders, prev.orders)}${tile("Shares", today.shares, prev.shares)}
 </tr></table>
+${h2("New newsletter subscribers")}${table(["Time", "Email or phone", "Promo code", "From"], newSubs.map(s => [timeOf(s.ts), s.contact, s.code, [s.city, country(s.country)].filter(Boolean).join(", ")]))}
 ${h2("WhatsApp orders")}${table(["Time", "Print · size · finish · qty · price", "From"], orders.map(o => [timeOf(o.ts), `${name(o.item)} · ${(o.detail || "").replace(/ \| /g, " · ")}`, [o.city, country(o.country)].filter(Boolean).join(", ")]))}
 ${h2("Most viewed prints")}${table(["Print", "Views", "Visitors", "Orders"], prints)}
 ${h2("Where visitors came from")}${bars(visitsBy(e => e.ref || "Direct (typed or bookmarked)"))}
@@ -236,11 +357,13 @@ ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choos
 </div></body></html>`;
 
   const text = `Just Framed daily report, ${dateText} (${period}, until ${timeOf(end)})\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`
+    + (newSubs.length ? "New newsletter subscribers:\n" + newSubs.map(s => `${timeOf(s.ts)}  ${s.contact}  ${s.code}`).join("\n") + "\n\n" : "")
     + (orders.length ? "WhatsApp orders:\n" + orders.map(o => `${timeOf(o.ts)}  ${name(o.item)}  ${o.detail || ""}`).join("\n") + "\n\n" : "")
     + (prints.length ? "Most viewed prints:\n" + prints.map(p => `${p[1]}  ${p[0]}`).join("\n") : "No print pages viewed today.");
 
   const book = await xlsx({ sheets: [
-    statisticsSheet({ day, before, back, shop, name, country, heading: `${dateText} · ${period}, until ${timeOf(end)}`, avgLabel }),
+    statisticsSheet({ day, before, back, shop, name, country, signups, heading: `${dateText} · ${period}, until ${timeOf(end)}`, avgLabel }),
+    subscribersSheet(subs, coded, country),
     eventsSheet(day, name),
   ] });
 
@@ -261,10 +384,10 @@ const PAGES = { home: "Home", shop: "Shop (all prints)", collections: "Collectio
   contact: "Contact", cart: "Cart", "poster-box": "Poster box" };
 // What the click statistics in index.html record
 const CLICKS = ["WhatsApp order", "Cart order", "WhatsApp", "Instagram", "Facebook", "Email", "Send message form", "Share print", "Zoom photo",
-  "Photo thumbnail", "Next/previous photo", "Zoom finish photo", "Sort", "Slideshow", "Print card", "Collection card", "Menu", "Previous/next print", "Footer", "Button", "Link"];
+  "Photo thumbnail", "Next/previous photo", "Zoom finish photo", "Sort", "Slideshow", "Print card", "Collection card", "Menu", "Previous/next print", "Footer", "Button", "Link", "Newsletter sign-up", "Newsletter closed"];
 const ORDER_CLICKS = ["WhatsApp order", "Cart order"], CONTACT_CLICKS = ["WhatsApp", "Instagram", "Facebook", "Email", "Send message form"];
 
-function statisticsSheet({ day, before, back, shop, name, country, heading, avgLabel }) {
+function statisticsSheet({ day, before, back, shop, name, country, signups, heading, avgLabel }) {
   const C = (v, s) => ({ v, s }), val = c => c && typeof c === "object" ? c.v : c;
   const yes = b => C(b ? "Yes" : "No", b ? "yes" : "no");
   const time = ms => C(ms / DAY, "time"), pct = (a, b) => C(b ? a / b : 0, "pct");
@@ -327,8 +450,9 @@ function statisticsSheet({ day, before, back, shop, name, country, heading, avgL
     ["Visits", "visits"], ["Page views", "views"], ["Pages per visit", "perVisit", "dec"], ["Average time per visit (min:sec)", "visitTime", "time"],
     ["Print pages viewed", "printViews"], [`Different prints opened (of ${shop.length} in the shop)`, "printsSeen"], ["Sizes and finishes picked", "picks"],
     ["WhatsApp orders", "orders"], ["Cart orders", "cart"], ["Shares", "shares"], ["Contact clicks (WhatsApp, Instagram, Facebook, email, form)", "contact"],
-    ["Visits that ended in an order", "orderRate", "pct"]];
+    ["Visits that ended in an order", "orderRate", "pct"], ["Newsletter sign-ups", "signups"]];
   now.returning = now.visitors - now.fresh;
+  [now.signups, prev.signups] = signups;
   section("Overview", ["", "This period", avgLabel.replace(/^./, c => c.toUpperCase()), "Change"], overview.map(([label, k, kind]) => {
     const style = { dec: "dec", time: "time", pct: "pct" }[kind] || "int";
     const a = now[k], b = kind === "only" ? null : kind ? prev[k] : prev[k] / 7;
@@ -407,6 +531,15 @@ function statisticsSheet({ day, before, back, shop, name, country, heading, avgL
   return { name: "Statistics", rows, charts, grid: false, cols: [44, 19, 16, 14, 14, 18, 14, 16, 3] };
 }
 
+// Everyone on the newsletter, newest first
+function subscribersSheet(subs, coded, country) {
+  const head = ["Signed up (Beirut)", "Email or phone", "Type", "Promo code", "Code emailed", "WhatsApp orders with the code", "Country", "City", "Language"];
+  const used = code => coded.filter(e => (e.detail || "").includes(code)).length;
+  return { name: "Subscribers", freeze: 1, filter: subs.length > 0, cols: [19, 32, 8, 14, 13, 16, 16, 16, 10],
+    rows: [head.map(h => ({ v: h, s: "head" })), ...subs.map(s => [{ v: excelTime(s.ts), s: "date" }, s.contact, s.kind, s.code,
+      s.kind === "email" ? (s.emailed ? "Yes" : "No") : "", used(s.code), s.country ? country(s.country) : "", s.city, s.lang])] };
+}
+
 function eventsSheet(day, name) {
   const head = ["Time (Beirut)", "Visitor", "Visit", "Type", "Page", "Item", "Clicked or picked", "Detail", "Seconds", "Came from", "Country", "City", "Device", "Browser", "System", "Language"];
   return { name: "Events", freeze: 1, filter: true, cols: [19, 14, 14, 8, 11, 30, 20, 34, 9, 22, 9, 16, 10, 16, 10, 10],
@@ -433,8 +566,8 @@ function mime({ from, to, subject, text, html, attachment }) {
     `--${alt}`, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: base64", "", b64(text),
     `--${alt}`, "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64", "", b64(html),
     `--${alt}--`, "",
-    `--${mixed}`, `Content-Type: ${attachment.type}; name="${attachment.name}"`, `Content-Disposition: attachment; filename="${attachment.name}"`,
-    "Content-Transfer-Encoding: base64", "", b64(attachment.body),
+    ...(attachment ? [`--${mixed}`, `Content-Type: ${attachment.type}; name="${attachment.name}"`, `Content-Disposition: attachment; filename="${attachment.name}"`,
+      "Content-Transfer-Encoding: base64", "", b64(attachment.body)] : []),
     `--${mixed}--`, "",
   ].join("\r\n");
 }

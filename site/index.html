@@ -24,7 +24,7 @@
 <style>
 :root{
   --bg:#F5F2ED; --bg-alt:#EFEBE4; --ink:#1C1B18; --muted:#807A70; --line:#DDD7CD;
-  --dark:#1F1E1B; --dark-ink:#EDE9E2; --dark-muted:#A39D92; --card:#FFFFFF; --btn:#1C1B18; --btn-ink:#F5F2ED;
+  --dark:#1F1E1B; --dark-ink:#EDE9E2; --dark-muted:#A39D92; --card:#FFFFFF; --btn:#1C1B18; --btn-ink:#F5F2ED; --err:#B3261E;
   --sans:"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif;
   --serif:"EB Garamond","Iowan Old Style",Georgia,"Times New Roman",serif;
   --script:"Herr Von Muellerhoff","Snell Roundhand","Brush Script MT",cursive;
@@ -33,7 +33,7 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#16150F; --bg-alt:#1C1B17; --ink:#ECE8E0; --muted:#9C968B; --line:#34322C;
-    --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F;
+    --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F; --err:#F2A097;
   }
 }
 /* logo.png is faint grey. It's drawn twice, split along a slanted line past the lens:
@@ -50,7 +50,7 @@
 :root[data-theme="dark"] .logo img.logo-text{filter:brightness(0) invert(1) drop-shadow(0 0 0 #fff) drop-shadow(0 0 0 #fff)}
 :root[data-theme="dark"]{
   --bg:#16150F; --bg-alt:#1C1B17; --ink:#ECE8E0; --muted:#9C968B; --line:#34322C;
-  --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F;
+  --dark:#0F0E0B; --card:#1F1E1A; --btn:#ECE8E0; --btn-ink:#16150F; --err:#F2A097;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -313,6 +313,35 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
 .cookie .acts{display:flex;gap:8px;flex-shrink:0}
 .cookie .acts button{font-size:13px;padding:7px 12px;background:var(--bg-alt)}
 .cookie .acts button.yes{background:var(--btn);color:var(--btn-ink)}
+
+/* Newsletter pop-up */
+.nl{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(20,19,16,.55);opacity:0;transition:opacity .25s}
+.nl.on{opacity:1}
+.nl-box{position:relative;background:var(--card);width:100%;max-width:440px;max-height:100%;overflow:auto;padding:38px 32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.25);transform:translateY(12px);transition:transform .25s;outline:none}
+.nl.on .nl-box{transform:none}
+.nl-x{position:absolute;top:8px;right:8px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.nl-x svg{width:18px;height:18px}
+.nl-kicker{font-family:var(--sans);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.nl h2{font-size:30px;line-height:1.15;font-weight:400;margin-bottom:12px}
+.nl p{color:var(--muted);font-size:15.5px;line-height:1.6;margin-bottom:20px}
+.nl form{display:grid;gap:10px}
+.nl input{font:inherit;font-size:16px;padding:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+.nl .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.nl .err{color:var(--err);font-size:13.5px;margin:0}
+.nl .fine{font-size:12.5px;margin:14px 0 0}
+.nl .acts{display:grid;gap:10px}
+.nl-code{font-family:var(--sans);font-size:22px;letter-spacing:.14em;border:1px dashed var(--line);padding:14px;text-align:center;margin-bottom:16px;user-select:all;-webkit-user-select:all}
+@media (max-width:480px){.nl-box{padding:34px 22px 22px}.nl h2{font-size:26px}}
+
+/* Promo code on the print page */
+.amount s{color:var(--muted);font-size:15px;margin-right:8px}
+.promo-line{font-family:var(--sans);font-size:12.5px;color:var(--muted);margin:-12px 0 18px}
+.promo{margin:0 0 18px;font-family:var(--sans);font-size:12.5px}
+.promo summary{cursor:pointer;color:var(--muted);width:max-content}
+.promo-in{display:flex;gap:8px;margin-top:10px}
+.promo-in input{flex:1;min-width:0;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);background:var(--card);color:var(--ink);text-transform:uppercase}
+.promo-in .btn{padding:10px 16px}
+.promo .hint{margin-top:6px;min-height:0}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--btn);color:var(--btn-ink);padding:12px 18px;font-family:var(--sans);font-size:12.5px;transition:.3s;z-index:60;pointer-events:none}
 .toast.on{opacity:1;transform:translateX(-50%)}
@@ -658,7 +687,7 @@ async function loadCatalog(){
 const $ = s=>document.querySelector(s);
 const esc = s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const whereText = p=>[p.place,p.year].filter(Boolean).join(", ");
-const money = n=>"$"+n.toLocaleString("en-US");
+const money = n=>"$"+n.toLocaleString("en-US",{minimumFractionDigits:n%1?2:0,maximumFractionDigits:2});
 const CUSTOM = {id:"custom", label:"Custom", custom:true};
 const sizesFor = p=>(p&&p.sizes)||SIZES;
 const sizeOptions = p=>[...sizesFor(p),CUSTOM];
@@ -671,6 +700,18 @@ const defSize = p=>Math.min(DEFAULT_SIZE,sizesFor(p).length-1);
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
 let cart = store("jt-cart") || [];
 function saveCart(){store("jt-cart",cart)}
+/* ---------- Promo code ----------
+   Newsletter subscribers get a personal code (newsletter pop-up below, /subscribe in worker.js) for
+   PROMO.percent off a first order from $PROMO.min. Keep in sync with PROMO in worker.js. */
+const PROMO={percent:10,min:50};
+const promoCode=()=>store("jt-promo")||"";
+const promoOff=total=>promoCode()&&total>=PROMO.min?Math.round(total*PROMO.percent)/100:0;
+// Checks a typed code with the studio's list and keeps it on this device if it's valid
+async function checkPromo(code){
+  const j=await (await fetch("/promo?code="+encodeURIComponent(code))).json();
+  if(j.ok) store("jt-promo",j.code);
+  return j.ok?j.code:null;
+}
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2400)}
 
 /* Grid card crop from the sheet's optional "poster" column: the poster's edges in the first (room)
@@ -894,6 +935,7 @@ function product(slug){
       <h1>${esc(p.title)}</h1>
       ${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}
       <p class="amount" id="amount">${money(priceOf(defSize(p),DEFAULT_FINISH))}</p>
+      <p class="promo-line" id="promoLine" hidden></p>
       <p class="desc">${esc(p.desc)}</p>
       <form id="buy">
         <fieldset><legend>Print size <em id="sizeLbl">Select</em></legend><div class="opts">
@@ -906,6 +948,9 @@ function product(slug){
           <a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2Z"/></svg>Contact on WhatsApp</a>
         </div>
         <p class="hint" id="hint"></p>
+        <details class="promo" id="promoBox"${promoCode()?" open":""}><summary>Have a promo code?</summary>
+          <div class="promo-in"><input id="promoIn" aria-label="Promo code" placeholder="Promo code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(promoCode())}"><button type="button" class="btn ghost" id="promoApply">Apply</button></div>
+          <p class="hint" id="promoMsg" role="status"></p></details>
       </form>
       <button type="button" class="btn ghost share" id="shareBtn" data-title="${esc(p.title)}" data-slug="${esc(p.slug)}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>Share this print</button>
       <dl class="specs">
@@ -954,7 +999,7 @@ function cartPage(){
     <div><h3>${esc(p.title)}</h3><p class="meta">${esc(findSize(it.size).label)}, ${esc(FINISHES.find(f=>f.id===it.finish).label.toLowerCase())}</p>
       <div class="qty" style="display:inline-flex;margin-top:8px"><button data-cq="${i}" data-d="-1" aria-label="Decrease">−</button><output>${it.qty}</output><button data-cq="${i}" data-d="1" aria-label="Increase">+</button></div></div>
     <div class="right">${money(it.price*it.qty)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
-  <div class="cart-foot"><div><p class="total">Subtotal ${money(total)}</p><p style="color:var(--muted);font-size:14px">Shipping is calculated when the studio confirms your order.</p></div>
+  <div class="cart-foot"><div><p class="total">Subtotal ${money(total)}</p>${promoOff(total)?`<p style="font-family:var(--sans);font-size:14px;color:var(--muted)">${PROMO.percent}% off with code ${esc(promoCode())}: −${money(promoOff(total))}</p><p class="total">Total ${money(total-promoOff(total))}</p>`:""}<p style="color:var(--muted);font-size:14px">Shipping is calculated when the studio confirms your order.</p></div>
   <a class="btn" id="checkout" href="#">Send order to the studio</a></div></div>`;
 }
 /* Helper page (#/poster-box, not linked anywhere): drag a box around the poster in a print's first
@@ -1075,18 +1120,29 @@ function bind(page,arg){
       o.value=v>0?r1(t===f.cl?v/ratio:v*ratio):""});
     const price=()=>{const s=SZ.find(x=>x.id===f.size.value),fi=FINISHES.find(x=>x.id===f.finish.value);return priceOf(s&&!s.custom?Math.max(0,SZ.indexOf(s)):0, fi?fi.id:"print")};
     const upd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
-      $("#customDims").hidden=!cu;$("#amount").hidden=cu;$("#amount").textContent=money(price()*qty);$("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show [data-fin]").forEach(d=>d.hidden=!fi||d.dataset.fin!==fi.id);$("#hint").textContent=""};
+      $("#customDims").hidden=!cu;$("#amount").hidden=cu;
+      const total=price()*qty, off=cu?0:promoOff(total), code=promoCode(), pl=$("#promoLine");
+      $("#amount").innerHTML=off?`<s>${money(total)}</s> ${money(total-off)}`:money(total);
+      pl.hidden=!code||cu; pl.textContent=off?`${PROMO.percent}% off with your code ${code}`:`Your code ${code} takes ${PROMO.percent}% off orders from ${money(PROMO.min)}`;
+$("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show [data-fin]").forEach(d=>d.hidden=!fi||d.dataset.fin!==fi.id);$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
     f.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
     const p=PRINTS.find(x=>x.slug===arg), wa=$("#waBtn");
     const waUpd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
       let msg=`Hello, I'm interested in the print "${p.title}"${whereText(p)?` (${whereText(p)})`:""}.`;
-      if(s||fi) msg+=`\n\nSize: ${s?sizeText(s):"not chosen yet"}\nFinish: ${fi?fi.label:"not chosen yet"}\nQuantity: ${qty}${cu?"":`\nPrice shown: ${money(price()*qty)}`}`;
+      if(s||fi) msg+=`\n\nSize: ${s?sizeText(s):"not chosen yet"}\nFinish: ${fi?fi.label:"not chosen yet"}\nQuantity: ${qty}${cu?"":`\nPrice shown: ${money(price()*qty)}`}${!cu&&promoOff(price()*qty)?`\nPromo code ${promoCode()} (${PROMO.percent}% off): ${money(price()*qty-promoOff(price()*qty))}`:""}`;
       msg+=`\n\n${printLink(p.slug)}`;
       wa.href=waLink(msg);};
     f.addEventListener("change",waUpd);f.addEventListener("input",waUpd);
     f.querySelectorAll("[data-q]").forEach(b=>b.addEventListener("click",waUpd));
     f.onsubmit=e=>e.preventDefault();
+    const pin=$("#promoIn"), pmsg=$("#promoMsg");
+    $("#promoApply").onclick=async()=>{const v=pin.value.trim().toUpperCase();
+      if(!v){store("jt-promo","");pmsg.textContent="";upd();waUpd();return}
+      pmsg.textContent="Checking…";
+      try{pmsg.textContent=await checkPromo(v)?"Code applied.":"That code isn't valid."}catch(e){pmsg.textContent="Couldn't check the code. Please try again."}
+      upd();waUpd()};
+    pin.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();$("#promoApply").click()}});
     upd();waUpd();
   }
   if(page==="cart"){
@@ -1095,7 +1151,7 @@ function bind(page,arg){
     const c=$("#checkout"); if(c){
       const lines=cart.map(it=>{const p=PRINTS.find(x=>x.slug===it.slug);return `${it.qty} × ${p.title} (${findSize(it.size).label}, ${FINISHES.find(f=>f.id===it.finish).label}) — ${money(it.price*it.qty)}`});
       const total=cart.reduce((a,it)=>a+it.price*it.qty,0);
-      c.href="mailto:justframed-lb@outlook.com?subject="+encodeURIComponent("Print order")+"&body="+encodeURIComponent("Hello,\n\nI'd like to order:\n\n"+lines.join("\n")+"\n\nSubtotal: "+money(total)+"\n\nShipping address:\n");
+      c.href="mailto:justframed-lb@outlook.com?subject="+encodeURIComponent("Print order")+"&body="+encodeURIComponent("Hello,\n\nI'd like to order:\n\n"+lines.join("\n")+"\n\nSubtotal: "+money(total)+(promoOff(total)?"\nPromo code "+promoCode()+" ("+PROMO.percent+"% off): "+money(total-promoOff(total)):"")+"\n\nShipping address:\n");
     }
   }
   if(page==="contact"){
@@ -1165,6 +1221,93 @@ function openViewer(imgs,start,onChange){
   lb.tabIndex=-1; go(start); lb.focus();
 }
 
+/* ---------- Newsletter pop-up ----------
+   Opens a few seconds into a visit; once closed, it comes back a week later, and never after
+   signing up. The sign-up goes to /subscribe (worker.js), which keeps it and returns the visitor's
+   promo code, or emails it to them when it can. The code stays on this device for print pages. */
+const X_ICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/></svg>';
+function newsletter(){
+  const s=store("jt-nl")||{};
+  if(s.done||Date.now()-(s.closed||0)<7*86400000||location.hash.startsWith("#/poster-box")) return;
+  setTimeout(openNewsletter,4000);
+}
+function openNewsletter(){
+  if(document.querySelector(".nl")) return;
+  const nl=document.createElement("div"); nl.className="nl";
+  nl.innerHTML=`<div class="nl-box" role="dialog" aria-modal="true" aria-labelledby="nlTitle" tabindex="-1">
+    <button type="button" class="nl-x" aria-label="Close">${X_ICON}</button>
+    <div class="nl-body">
+      <p class="nl-kicker">Newsletter</p>
+      <h2 id="nlTitle">${PROMO.percent}% off your first order</h2>
+      <p>Subscribe to our newsletter and get ${PROMO.percent}% off your first order starting ${money(PROMO.min)}. You'll also be the first to hear about new prints, discounts and packages.</p>
+      <form novalidate>
+        <input name="c" type="text" inputmode="email" autocomplete="email" placeholder="Email or phone number" aria-label="Email or phone number">
+        <div class="hp" aria-hidden="true"><input name="hp" tabindex="-1" autocomplete="off"></div>
+        <button class="btn full" type="submit">Subscribe</button>
+        <p class="err" role="alert"></p>
+      </form>
+      <p class="fine">No spam. Unsubscribe any time.</p>
+    </div></div>`;
+  document.body.appendChild(nl);
+  const box=nl.querySelector(".nl-box"), body=nl.querySelector(".nl-body"), back=document.activeElement, overflow=document.body.style.overflow;
+  let done=false;
+  const close=()=>{
+    if(!done){store("jt-nl",{closed:Date.now()});stat("click",{x:"Newsletter closed"})}
+    nl.classList.remove("on");setTimeout(()=>nl.remove(),250);
+    document.body.style.overflow=overflow;document.removeEventListener("keydown",key);back&&back.focus&&back.focus()};
+  // Esc closes; Tab stays inside the pop-up
+  const key=e=>{if(e.key==="Escape"){close();return}
+    if(e.key!=="Tab") return;
+    const f=[...box.querySelectorAll("a[href],button,input:not([tabindex='-1'])")].filter(x=>x.offsetParent), a=f[0], z=f[f.length-1];
+    if(e.shiftKey&&(document.activeElement===a||document.activeElement===box)){e.preventDefault();z.focus()}
+    else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}};
+  document.addEventListener("keydown",key);
+  nl.addEventListener("click",e=>{if(e.target===nl||e.target.closest(".nl-x,[data-close]"))close()});
+  document.body.style.overflow="hidden";
+  requestAnimationFrame(()=>nl.classList.add("on"));
+  // Phones: focus the pop-up, not the field, so the keyboard doesn't jump up on its own
+  (matchMedia("(pointer:fine)").matches?box.querySelector("input"):box).focus();
+
+  const form=box.querySelector("form"), err=box.querySelector(".err"), btn=form.querySelector("button");
+  form.onsubmit=async e=>{
+    e.preventDefault(); err.textContent="";
+    const c=form.c.value.trim();
+    if(!c){err.textContent="Please enter your email or phone number.";form.c.focus();return}
+    btn.disabled=true;btn.textContent="Subscribing…";
+    try{
+      const r=await fetch("/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({c,hp:form.hp.value})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok||!j.ok) throw new Error(j.error||"Sign-up didn't go through. Please try again.");
+      done=true; store("jt-nl",{done:1}); if(j.code) store("jt-promo",j.code);
+      stat("click",{x:"Newsletter sign-up"});
+      thanks(j,c);
+    }catch(x){err.textContent=x instanceof TypeError?"No connection. Please try again.":x.message;btn.disabled=false;btn.textContent="Subscribe"}
+  };
+  const thanks=(j,c)=>{
+    const kicker=`<p class="nl-kicker">${j.again?"Already subscribed":"You're subscribed"}</p>`;
+    if(j.emailed||!j.code){
+      body.innerHTML=`${kicker}<h2 id="nlTitle">Check your inbox</h2><p>We sent your ${PROMO.percent}% code to <b>${esc(c)}</b>. It works on your first order of ${money(PROMO.min)} or more.</p>
+        <div class="acts"><button type="button" class="btn full" data-close>Continue browsing</button></div>`;
+    } else {
+      // Phone numbers: a WhatsApp chat with the studio that holds the code, so it's kept in WhatsApp
+      const wa=j.kind==="phone"?waLink(`Hello Just Framed, I subscribed to the newsletter. My ${PROMO.percent}% code is ${j.code}.`):"";
+      body.innerHTML=`${kicker}<h2 id="nlTitle">Here's your ${PROMO.percent}% off</h2>
+        <p>Use this code on your first order of ${money(PROMO.min)} or more. It's saved on this device, so print pages apply it for you.</p>
+        <p class="nl-code">${esc(j.code)}</p>
+        <div class="acts">${wa?`<a class="btn full wa" href="${esc(wa)}" target="_blank" rel="noopener">${WA_ICON}Keep it in WhatsApp</a>`:""}
+          <button type="button" class="btn full${wa?" ghost":""}" data-copy>Copy code</button>
+          <button type="button" class="btn ghost full" data-close>Continue browsing</button></div>
+        ${wa?`<p class="fine">“Keep it in WhatsApp” opens a chat with the studio with your code in it.</p>`:""}`;
+      const cp=body.querySelector("[data-copy]");
+      cp.onclick=()=>navigator.clipboard?.writeText(j.code).then(()=>cp.textContent="Copied",()=>{});
+    }
+    box.focus();
+    // The page on screen shows the discount right away
+    if(j.code&&$("#promoIn")){$("#promoIn").value=j.code;$("#promoBox").open=true;$("#buy").dispatchEvent(new Event("change"))}
+    else if(j.code&&location.hash.startsWith("#/cart")) route();
+  };
+}
+
 /* ---------- Boot ---------- */
 function logoHTML(){return IMAGES.logo?`<span class="logo-art"><img class="logo-text" src="${IMAGES.logo}" alt="Just Framed"><img class="logo-lens" src="${IMAGES.logo}" alt=""></span>`:"Just Framed"}
 $("#footIcons").innerHTML=contactIcons();
@@ -1174,6 +1317,7 @@ $("#logo").innerHTML=logoHTML(); $("#logo2").innerHTML=logoHTML();
 $(".menu-btn").onclick=e=>{const o=$("#nav").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",o)};
 if(!store("jt-cookie")) $("#cookie").hidden=false;
 document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-cookie",b.dataset.c);$("#cookie").hidden=true;statFlush()});
+newsletter();
 /* ---------- Visit statistics ----------
    Records which pages are viewed and for how long, what is clicked and which sizes and finishes
    are picked. worker.js (/t) saves it; analytics/report.mjs turns it into a report.
@@ -1222,7 +1366,7 @@ document.addEventListener("click",e=>{
   const {pg,i}=statPage(), hrefSlug=h=>(h.match(/#\/(?:print|collection)\/([^/?#]+)/)||[])[1];
   const href=el.getAttribute("href")||"";
   let x=null, item=i, d;
-  if(el.id==="waBtn"){x="WhatsApp order";d=["#sizeLbl","#finLbl","#qty","#amount"].map(s=>$(s)&&!$(s).hidden?$(s).textContent.trim():"").filter(Boolean).join(" | ")}
+  if(el.id==="waBtn"){x="WhatsApp order";d=["#sizeLbl","#finLbl","#qty","#amount","#promoLine"].map(s=>$(s)&&!$(s).hidden?$(s).textContent.trim():"").filter(Boolean).join(" | ")}
   else if(el.matches("[data-wa]")) x="WhatsApp";
   else if(el.matches("[data-ig]")) x="Instagram";
   else if(href.includes("facebook.com")) x="Facebook";
