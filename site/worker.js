@@ -297,7 +297,7 @@ async function dailyReport(env, now, test, days = 1) {
 
   // Newsletter subscribers, and WhatsApp orders that carried a promo code (the code is in the order detail)
   const { results: subs } = await env.DB.prepare("SELECT * FROM subscribers ORDER BY ts DESC").all().catch(() => ({ results: [] }));
-  const { results: coded } = await env.DB.prepare("SELECT detail FROM events WHERE target = 'WhatsApp order' AND detail LIKE ?").bind(`%${PROMO.prefix}%`).all();
+  const { results: coded } = await env.DB.prepare("SELECT detail FROM events WHERE target IN ('WhatsApp order', 'Cart order') AND detail LIKE ?").bind(`%${PROMO.prefix}%`).all();
   const newSubs = subs.filter(s => s.ts >= start && s.ts < end);
   const signups = [newSubs.length, subs.filter(s => s.ts >= start - 7 * days * DAY && s.ts < start).length];
   const day = ev.filter(e => e.ts >= start), before = ev.filter(e => e.ts < start);
@@ -306,7 +306,7 @@ async function dailyReport(env, now, test, days = 1) {
     return {
       visitors: new Set(list.filter(e => e.type === "view").map(e => e.vid)).size, visits: visits.size,
       views: list.filter(e => e.type === "view").length,
-      orders: list.filter(e => e.target === "WhatsApp order").length, shares: list.filter(e => e.target === "Share print").length,
+      orders: list.filter(e => ORDER_CLICKS.includes(e.target)).length, shares: list.filter(e => e.target === "Share print").length,
     };
   };
   const today = stats(day), prev = stats(before);
@@ -316,7 +316,7 @@ async function dailyReport(env, now, test, days = 1) {
   const views = day.filter(e => e.type === "view");
   const prints = count(views.filter(e => e.page === "print").map(e => e.item)).slice(0, 10).map(([slug, n]) => [name(slug), n,
     new Set(views.filter(e => e.item === slug).map(e => e.vid)).size, day.filter(e => e.item === slug && e.target === "WhatsApp order").length]);
-  const orders = day.filter(e => e.target === "WhatsApp order");
+  const orders = day.filter(e => ORDER_CLICKS.includes(e.target));
   const timeOf = ts => new Date(ts).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
   const dateText = new Date(end - 1).toLocaleDateString("en-GB", { timeZone: TZ, weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const avg = n => Math.round(n / 7 * 10) / 10;
@@ -347,7 +347,7 @@ async function dailyReport(env, now, test, days = 1) {
 ${tile("Visitors", today.visitors, prev.visitors)}${tile("Visits", today.visits, prev.visits)}${tile("Page views", today.views, prev.views)}${tile("WhatsApp orders", today.orders, prev.orders)}${tile("Shares", today.shares, prev.shares)}
 </tr></table>
 ${h2("New newsletter subscribers")}${table(["Time", "Email or phone", "Promo code", "From"], newSubs.map(s => [timeOf(s.ts), s.contact, s.code, [s.city, country(s.country)].filter(Boolean).join(", ")]))}
-${h2("WhatsApp orders")}${table(["Time", "Print · size · finish · qty · price", "From"], orders.map(o => [timeOf(o.ts), `${name(o.item)} · ${(o.detail || "").replace(/ \| /g, " · ")}`, [o.city, country(o.country)].filter(Boolean).join(", ")]))}
+${h2("WhatsApp orders")}${table(["Time", "Print · size · finish · qty · price", "From"], orders.map(o => [timeOf(o.ts), orderText(o, name), [o.city, country(o.country)].filter(Boolean).join(", ")]))}
 ${h2("Most viewed prints")}${table(["Print", "Views", "Visitors", "Orders"], prints)}
 ${h2("Where visitors came from")}${bars(visitsBy(e => e.ref || "Direct (typed or bookmarked)"))}
 ${h2("Countries")}${bars(visitsBy(e => country(e.country)))}
@@ -358,7 +358,7 @@ ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choos
 
   const text = `Just Framed daily report, ${dateText} (${period}, until ${timeOf(end)})\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`
     + (newSubs.length ? "New newsletter subscribers:\n" + newSubs.map(s => `${timeOf(s.ts)}  ${s.contact}  ${s.code}`).join("\n") + "\n\n" : "")
-    + (orders.length ? "WhatsApp orders:\n" + orders.map(o => `${timeOf(o.ts)}  ${name(o.item)}  ${o.detail || ""}`).join("\n") + "\n\n" : "")
+    + (orders.length ? "WhatsApp orders:\n" + orders.map(o => `${timeOf(o.ts)}  ${orderText(o, name)}`).join("\n") + "\n\n" : "")
     + (prints.length ? "Most viewed prints:\n" + prints.map(p => `${p[1]}  ${p[0]}`).join("\n") : "No print pages viewed today.");
 
   const book = await xlsx({ sheets: [
@@ -384,7 +384,10 @@ const PAGES = { home: "Home", shop: "Shop (all prints)", collections: "Collectio
   contact: "Contact", cart: "Cart", "poster-box": "Poster box" };
 // What the click statistics in index.html record
 const CLICKS = ["WhatsApp order", "Cart order", "WhatsApp", "Instagram", "Facebook", "Email", "Send message form", "Share print", "Zoom photo",
-  "Photo thumbnail", "Next/previous photo", "Zoom finish photo", "Sort", "Slideshow", "Print card", "Collection card", "Menu", "Previous/next print", "Footer", "Button", "Link", "Newsletter sign-up", "Newsletter closed"];
+  "Photo thumbnail", "Next/previous photo", "Zoom finish photo", "Sort", "Slideshow", "Print card", "Collection card", "Menu", "Previous/next print", "Footer", "Button", "Link", "Newsletter sign-up", "Newsletter closed", "Add to cart", "Cart"];
+// What an order looks like in the report: one print, or everything in the cart (both are sent on WhatsApp)
+const orderText = (o, name) => o.target === "Cart order" ? "Cart: " + (o.detail || "").replace(/ \| /g, " · ")
+  : [name(o.item), ...(o.detail ? o.detail.split(" | ") : [])].join(" · ");
 const ORDER_CLICKS = ["WhatsApp order", "Cart order"], CONTACT_CLICKS = ["WhatsApp", "Instagram", "Facebook", "Email", "Send message form"];
 
 function statisticsSheet({ day, before, back, shop, name, country, signups, heading, avgLabel }) {
@@ -440,7 +443,7 @@ function statisticsSheet({ day, before, back, shop, name, country, signups, head
     return { visitors: visitors.size, fresh: [...visitors].filter(v => !returning.has(v)).length, visits: sids.size, views: views.length,
       perVisit: sids.size ? views.length / sids.size : 0, visitTime: t.length ? t.reduce((a, b) => a + b, 0) / t.length : 0,
       printViews: views.filter(e => e.page === "print").length, printsSeen: uniq(views.filter(e => e.page === "print"), e => e.item),
-      picks: list.filter(e => e.type === "choose").length, orders: clicks(["WhatsApp order"]).length, cart: clicks(["Cart order"]).length,
+      picks: list.filter(e => e.type === "choose").length, orders: clicks(["WhatsApp order"]).length, cart: clicks(["Cart order"]).length, added: clicks(["Add to cart"]).length,
       shares: clicks(["Share print"]).length, contact: clicks(CONTACT_CLICKS).length,
       orderRate: sids.size ? [...sids].filter(s => ordered.has(s)).length / sids.size : 0 };
   };
@@ -449,7 +452,7 @@ function statisticsSheet({ day, before, back, shop, name, country, signups, head
   const overview = [["Visitors (different people)", "visitors"], ["   New visitors", "fresh", "only"], ["   Returning visitors", "returning", "only"],
     ["Visits", "visits"], ["Page views", "views"], ["Pages per visit", "perVisit", "dec"], ["Average time per visit (min:sec)", "visitTime", "time"],
     ["Print pages viewed", "printViews"], [`Different prints opened (of ${shop.length} in the shop)`, "printsSeen"], ["Sizes and finishes picked", "picks"],
-    ["WhatsApp orders", "orders"], ["Cart orders", "cart"], ["Shares", "shares"], ["Contact clicks (WhatsApp, Instagram, Facebook, email, form)", "contact"],
+    ["WhatsApp orders (one print)", "orders"], ["WhatsApp orders from the cart", "cart"], ["Prints added to the cart", "added"], ["Shares", "shares"], ["Contact clicks (WhatsApp, Instagram, Facebook, email, form)", "contact"],
     ["Visits that ended in an order", "orderRate", "pct"], ["Newsletter sign-ups", "signups"]];
   now.returning = now.visitors - now.fresh;
   [now.signups, prev.signups] = signups;
@@ -524,9 +527,9 @@ function statisticsSheet({ day, before, back, shop, name, country, signups, head
   section("From visit to order", ["Step", "Visits", "Share of visits"], steps.map(([k, n]) => [k, n, pct(n, visits.length)]),
     { chart: { title: "Visits reaching each step", col: 1 }, keep: true });
 
-  const orders = day.filter(e => e.target === "WhatsApp order");
+  const orders = day.filter(e => ORDER_CLICKS.includes(e.target));
   section("WhatsApp orders", ["Print · size · finish · qty · price", "Time (Beirut)", "From"], orders.map(o => [
-    C([name(o.item), ...(o.detail ? o.detail.split(" | ") : [])].join(" · "), "wrap"), C(excelTime(o.ts), "date"), [o.city, country(o.country)].filter(Boolean).join(", ")]));
+    C(orderText(o, name), "wrap"), C(excelTime(o.ts), "date"), [o.city, country(o.country)].filter(Boolean).join(", ")]));
 
   return { name: "Statistics", rows, charts, grid: false, cols: [44, 19, 16, 14, 14, 18, 14, 16, 3] };
 }

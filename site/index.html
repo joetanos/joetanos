@@ -74,8 +74,12 @@ footer .logo img{height:60px}
 nav.main{display:flex;gap:26px}
 nav.main a,.cart-link,.small-link{font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
 nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:1}
-.cart-link{display:flex;align-items:center;gap:6px;opacity:.8}
-.cart-link svg{width:13px;height:13px}
+.head-r{display:flex;align-items:center;gap:26px}
+.cart-link{display:flex;align-items:center;gap:6px;opacity:.75;padding:8px 0}
+.cart-link:hover,.cart-link[aria-current]{opacity:1}
+.cart-link svg{width:15px;height:15px}
+.cart-n{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--btn);color:var(--btn-ink);font-size:10px;letter-spacing:0;display:inline-flex;align-items:center;justify-content:center}
+.cart-n[hidden]{display:none}
 .menu-btn{display:none;font-family:var(--sans);font-size:11px;letter-spacing:.12em;text-transform:uppercase}
 
 /* Media placeholder / images */
@@ -293,6 +297,13 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
 .cart-row .right button{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .cart-foot{display:flex;justify-content:space-between;align-items:center;padding:26px 0 90px;gap:20px;flex-wrap:wrap}
 .cart-foot .total{font-family:var(--sans);font-size:18px}
+.cart-foot .note{color:var(--muted);font-size:14px}
+.cart-foot .promo-off{font-family:var(--sans);font-size:14px;color:var(--muted)}
+.cart-acts{display:flex;flex-direction:column;align-items:center;gap:14px}
+.cart-acts .btn.wa{padding:16px 26px}
+.cart-row h3 a:hover{text-decoration:underline}
+.hint a{color:var(--ink);text-decoration:underline}
+.btn.wa.full{display:flex;margin-bottom:10px}
 .empty{padding:20px 0 100px;color:var(--muted)}
 .empty .btn{margin-top:20px}
 
@@ -359,6 +370,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
   nav.main.open{display:flex}
   .menu-btn{display:block}
   header.site .wrap{gap:14px}
+  .head-r{gap:18px}
   .cgrid,.grid3,footer .cols,.ptool-cols{grid-template-columns:1fr}
   .ccard.tall .ph{aspect-ratio:4/3}
   .cookie .wrap{flex-direction:column;align-items:flex-start;gap:12px}
@@ -372,13 +384,16 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
 <header class="site">
   <div class="wrap">
     <a href="#/" class="logo" aria-label="Just Framed, home" id="logo"></a>
-    <button class="menu-btn" aria-expanded="false" aria-controls="nav">Menu</button>
-    <nav class="main" id="nav" aria-label="Main">
-      <a href="#/shop">Prints</a>
-      <a href="#/collections">Collections</a>
-      <a href="#/about">About</a>
-      <a href="#/contact">Contact</a>
-    </nav>
+    <div class="head-r">
+      <nav class="main" id="nav" aria-label="Main">
+        <a href="#/shop">Prints</a>
+        <a href="#/collections">Collections</a>
+        <a href="#/about">About</a>
+        <a href="#/contact">Contact</a>
+      </nav>
+      <a href="#/cart" class="cart-link" id="cartLink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>Cart<span class="cart-n" id="cartCount" hidden></span></a>
+      <button class="menu-btn" aria-expanded="false" aria-controls="nav">Menu</button>
+    </div>
   </div>
 </header>
 
@@ -698,8 +713,29 @@ const priceOf = (sizeIdx,finId)=>(PRICE_TABLE[sizeIdx]||PRICE_TABLE[PRICE_TABLE.
 const DEFAULT_SIZE = 1, DEFAULT_FINISH = "oak"; // preselected on every print page: 50 × 75 cm, gallery wrapped
 const defSize = p=>Math.min(DEFAULT_SIZE,sizesFor(p).length-1);
 function store(k,v){try{if(v===undefined){return JSON.parse(localStorage.getItem(k))}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
-let cart = store("jt-cart") || [];
-function saveCart(){store("jt-cart",cart)}
+/* ---------- Cart ----------
+   Items are {slug, size, dims (custom sizes), finish, qty}, kept on the device. Prices come from
+   PRICE_TABLE each time, so they follow price changes. The cart is ordered on WhatsApp in one message. */
+let cart = (store("jt-cart") || []).filter(it=>it&&it.slug&&it.size&&it.finish&&it.qty>0);
+const cartCount = ()=>cart.reduce((a,it)=>a+it.qty,0);
+function saveCart(){store("jt-cart",cart);const c=$("#cartCount");if(c){c.textContent=cartCount();c.hidden=!cart.length}}
+// An item with its print, size label and price; null if the print or size is no longer in the sheet.
+// unit is null for a custom size: the studio quotes it.
+function cartLine(it){
+  const p=PRINTS.find(x=>x.slug===it.slug), fin=FINISHES.find(f=>f.id===it.finish); if(!p||!fin) return null;
+  const custom=it.size==="custom", sizes=sizesFor(p), si=sizes.findIndex(s=>s.id===it.size); if(!custom&&si<0) return null;
+  const unit=custom?null:priceOf(si,fin.id);
+  return {...it,p,fin,sizeLabel:custom?(it.dims?`Custom, ${it.dims}`:"Custom"):sizes[si].label,unit,total:unit==null?null:unit*it.qty};
+}
+const cartLines = ()=>cart.map(cartLine).filter(Boolean);
+const cartSubtotal = lines=>lines.reduce((a,l)=>a+(l.total||0),0);
+function cartMessage(lines){
+  const sub=cartSubtotal(lines), off=promoOff(sub), quote=lines.some(l=>l.unit==null);
+  return "Hello, I'd like to order these prints:\n\n"
+    +lines.map((l,k)=>`${k+1}. ${l.p.title}${whereText(l.p)?` (${whereText(l.p)})`:""}\nSize: ${l.sizeLabel}\nFinish: ${l.fin.label}\nQuantity: ${l.qty}\nPrice: ${l.total==null?"to be confirmed (custom size)":money(l.total)}\n${printLink(l.p.slug)}`).join("\n\n")
+    +`\n\nSubtotal: ${money(sub)}${quote?" + custom sizes":""}`
+    +(off?`\nPromo code ${promoCode()} (${PROMO.percent}% off): ${money(sub-off)}`:"");
+}
 /* ---------- Promo code ----------
    Newsletter subscribers get a personal code (newsletter pop-up below, /subscribe in worker.js) for
    PROMO.percent off a first order from $PROMO.min. Keep in sync with PROMO in worker.js. */
@@ -945,8 +981,9 @@ function product(slug){
           ${FINISHES.map(f=>`<label><input type="radio" name="finish" value="${f.id}"${f.id===DEFAULT_FINISH?" checked":""}><span>${f.label}</span></label>`).join("")}</div></fieldset>
         <div class="buyrow">
           <div class="qty"><button type="button" data-q="-1" aria-label="Decrease quantity">−</button><output id="qty">1</output><button type="button" data-q="1" aria-label="Increase quantity">+</button></div>
-          <a class="btn wa" id="waBtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2Z"/></svg>Contact on WhatsApp</a>
+          <button type="button" class="btn ghost" id="addCart">Add to cart</button>
         </div>
+        <a class="btn wa full" id="waBtn" href="#" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3 1 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.3-.2Z"/></svg>Contact on WhatsApp</a>
         <p class="hint" id="hint"></p>
         <details class="promo" id="promoBox"${promoCode()?" open":""}><summary>Have a promo code?</summary>
           <div class="promo-in"><input id="promoIn" aria-label="Promo code" placeholder="Promo code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(promoCode())}"><button type="button" class="btn ghost" id="promoApply">Apply</button></div>
@@ -991,16 +1028,20 @@ function contact(){
 }
 
 function cartPage(){
-  if(!cart.length) return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div><div class="empty"><p>Your cart is empty. Choose a print and a size to add it here.</p><a class="btn" href="#/shop">Browse prints</a></div></div>`;
-  const total = cart.reduce((a,it)=>a+it.price*it.qty,0);
+  const lines=cartLines();
+  if(!lines.length) return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div><div class="empty"><p>Your cart is empty. Choose a print, its size and finish, then press "Add to cart".</p><a class="btn" href="#/shop">Browse prints</a></div></div>`;
+  const sub=cartSubtotal(lines), off=promoOff(sub), quote=lines.some(l=>l.unit==null);
+  // What the visit statistics record for the order click (the promo code lets the report count codes used)
+  const summary=lines.map(l=>`${l.qty} × ${l.p.title} (${l.sizeLabel}, ${l.fin.label})`).join("; ")+` | Subtotal ${money(sub)}`+(off?` | ${PROMO.percent}% off with your code ${promoCode()}: ${money(sub-off)}`:"");
   return `<div class="wrap"><div class="phead"><h1>Your cart</h1></div>
-  ${cart.map((it,i)=>{const p=PRINTS.find(x=>x.slug===it.slug);if(!p)return "";const im=printImages(p);
-    return `<div class="cart-row"><a href="#/print/${p.slug}" class="ph"><img src="${sized(im[0].src,150)}" alt=""></a>
-    <div><h3>${esc(p.title)}</h3><p class="meta">${esc(findSize(it.size).label)}, ${esc(FINISHES.find(f=>f.id===it.finish).label.toLowerCase())}</p>
-      <div class="qty" style="display:inline-flex;margin-top:8px"><button data-cq="${i}" data-d="-1" aria-label="Decrease">−</button><output>${it.qty}</output><button data-cq="${i}" data-d="1" aria-label="Increase">+</button></div></div>
-    <div class="right">${money(it.price*it.qty)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
-  <div class="cart-foot"><div><p class="total">Subtotal ${money(total)}</p>${promoOff(total)?`<p style="font-family:var(--sans);font-size:14px;color:var(--muted)">${PROMO.percent}% off with code ${esc(promoCode())}: −${money(promoOff(total))}</p><p class="total">Total ${money(total-promoOff(total))}</p>`:""}<p style="color:var(--muted);font-size:14px">Shipping is calculated when the studio confirms your order.</p></div>
-  <a class="btn" id="checkout" href="#">Send order to the studio</a></div></div>`;
+  ${cart.map((it,i)=>{const l=cartLine(it);if(!l)return "";const im=printImages(l.p);
+    return `<div class="cart-row"><a href="#/print/${l.p.slug}" class="ph"><img src="${sized(im[0].src,150)}" alt=""></a>
+    <div><h3><a href="#/print/${l.p.slug}">${esc(l.p.title)}</a></h3><p class="meta">${esc(l.sizeLabel)}, ${esc(l.fin.label.toLowerCase())}</p>
+      <div class="qty" style="display:inline-flex;margin-top:8px"><button data-cq="${i}" data-d="-1" aria-label="Decrease quantity">−</button><output>${it.qty}</output><button data-cq="${i}" data-d="1" aria-label="Increase quantity">+</button></div></div>
+    <div class="right">${l.total==null?"Price on request":money(l.total)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
+  <div class="cart-foot"><div id="cartSum" data-d="${esc(summary)}"><p class="total">Subtotal ${money(sub)}</p>${off?`<p class="promo-off">${PROMO.percent}% off with code ${esc(promoCode())}: −${money(off)}</p><p class="total">Total ${money(sub-off)}</p>`:""}
+    ${quote?`<p class="note">Custom sizes are priced by the studio when it replies.</p>`:""}<p class="note">Shipping is calculated when the studio confirms your order.</p></div>
+  <div class="cart-acts"><a class="btn wa" id="checkout" href="${esc(waLink(cartMessage(lines)))}" target="_blank" rel="noopener">${WA_ICON}Order on WhatsApp</a><a class="small-link" href="#/shop">Continue shopping</a></div></div></div>`;
 }
 /* Helper page (#/poster-box, not linked anywhere): drag a box around the poster in a print's first
    photo, check the card preview, and copy the numbers into the sheet's "poster" column. */
@@ -1051,6 +1092,7 @@ function route(){
   else html=notFound();
   $("#main").innerHTML=html; document.title=title; window.scrollTo(0,0);
   document.querySelectorAll("nav.main a").forEach(a=>{const h=a.getAttribute("href").slice(2);a.toggleAttribute("aria-current",page===h||(h==="shop"&&page==="print")||(h==="collections"&&page==="collection"));if(a.hasAttribute("aria-current"))a.setAttribute("aria-current","page")});
+  $("#cartLink").toggleAttribute("aria-current",page==="cart");
   $("#nav").classList.remove("open");$(".menu-btn").setAttribute("aria-expanded","false");
   document.querySelectorAll("#main [data-wa]").forEach(a=>{a.href=waLink();a.target="_blank";a.rel="noopener"});
   document.querySelectorAll("#main [data-ig]").forEach(a=>{a.href=igLink();a.target="_blank";a.rel="noopener"});
@@ -1136,6 +1178,15 @@ $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.
     f.addEventListener("change",waUpd);f.addEventListener("input",waUpd);
     f.querySelectorAll("[data-q]").forEach(b=>b.addEventListener("click",waUpd));
     f.onsubmit=e=>e.preventDefault();
+    // The same print, size and finish adds to the quantity already in the cart
+    $("#addCart").onclick=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),h=$("#hint");
+      if(!s||!fi){h.textContent="Choose a size and a finish first.";return}
+      if(s.custom&&!dims()){h.textContent="Enter the length and width of your custom size first.";f.cl.focus();return}
+      const it={slug:p.slug,size:s.id,dims:s.custom?dims():"",finish:fi.id};
+      const same=cart.find(x=>x.slug===it.slug&&x.size===it.size&&(x.dims||"")===it.dims&&x.finish===it.finish);
+      if(same) same.qty=Math.min(99,same.qty+qty); else cart.push({...it,qty});
+      saveCart();
+      h.innerHTML=`Added to your cart. <a href="#/cart">View cart (${cartCount()})</a>`};
     const pin=$("#promoIn"), pmsg=$("#promoMsg");
     $("#promoApply").onclick=async()=>{const v=pin.value.trim().toUpperCase();
       if(!v){store("jt-promo","");pmsg.textContent="";upd();waUpd();return}
@@ -1146,13 +1197,9 @@ $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.
     upd();waUpd();
   }
   if(page==="cart"){
-    document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.rm,1);saveCart();route()});
-    document.querySelectorAll("[data-cq]").forEach(b=>b.onclick=()=>{const it=cart[+b.dataset.cq];it.qty=Math.max(1,it.qty+ +b.dataset.d);saveCart();route()});
-    const c=$("#checkout"); if(c){
-      const lines=cart.map(it=>{const p=PRINTS.find(x=>x.slug===it.slug);return `${it.qty} × ${p.title} (${findSize(it.size).label}, ${FINISHES.find(f=>f.id===it.finish).label}) — ${money(it.price*it.qty)}`});
-      const total=cart.reduce((a,it)=>a+it.price*it.qty,0);
-      c.href="mailto:justframed-lb@outlook.com?subject="+encodeURIComponent("Print order")+"&body="+encodeURIComponent("Hello,\n\nI'd like to order:\n\n"+lines.join("\n")+"\n\nSubtotal: "+money(total)+(promoOff(total)?"\nPromo code "+promoCode()+" ("+PROMO.percent+"% off): "+money(total-promoOff(total)):"")+"\n\nShipping address:\n");
-    }
+    const redraw=()=>{const y=scrollY;saveCart();route();scrollTo(0,y)};
+    document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{cart.splice(+b.dataset.rm,1);redraw()});
+    document.querySelectorAll("[data-cq]").forEach(b=>b.onclick=()=>{const it=cart[+b.dataset.cq];it.qty=Math.max(1,Math.min(99,it.qty+ +b.dataset.d));redraw()});
   }
   if(page==="contact"){
     $("#contact").onsubmit=e=>{e.preventDefault();const d=new FormData(e.target);
@@ -1382,7 +1429,9 @@ document.addEventListener("click",e=>{
   else if(href.includes("facebook.com")) x="Facebook";
   else if(href.startsWith("mailto:")) x="Email";
   else if(el.id==="shareBtn") x="Share print";
-  else if(el.id==="checkout") x="Cart order";
+  else if(el.id==="checkout"){x="Cart order";d=$("#cartSum")?.dataset.d}
+  else if(el.id==="addCart"){x="Add to cart";d=["#sizeLbl","#finLbl","#qty"].map(s=>$(s).textContent.trim()).join(" | ")}
+  else if(el.id==="cartLink") x="Cart";
   else if(el.closest(".gallery .stage")&&el.tagName==="IMG") x="Zoom photo";
   else if(el.closest(".gallery .thumbs")) x="Photo thumbnail";
   else if(el.closest(".gallery .gnav")) x="Next/previous photo";
