@@ -154,6 +154,8 @@ section.block{padding:0 0 80px}
 .pcard:hover .ph .alt{opacity:1}.pcard h3{font-size:12.5px;font-weight:500;letter-spacing:0;line-height:1.35;margin-bottom:4px}
 .pcard .where{font-style:italic;font-size:11.5px;color:var(--muted);margin-bottom:6px}
 .pcard .price{font-family:var(--sans);font-size:11px}
+.per{color:var(--muted);font-size:.85em}
+.amount .per{font-size:.65em}
 
 /* Poster box helper page (#/poster-box) */
 .ptool{padding-bottom:80px}
@@ -675,7 +677,8 @@ function rowToPrint(r){
     desc:g("description","desc"), coords:g("coordinates","coords"),
     collections:g("collections","collection").split(/[,|\n]/).map(collectionSlug).filter(Boolean),
     images:g("images","image","photos").split(/\||\n|\s+(?=https?:)/).map(x=>x.trim()).filter(Boolean),
-    sizes:sizes.length?sizes:undefined, focus:g("focus"), zoom:g("zoom"), poster:g("poster")};
+    sizes:sizes.length?sizes:undefined, focus:g("focus"), zoom:g("zoom"), poster:g("poster"),
+    pieces:Math.max(1,parseInt(g("pieces","panels"))||1)}; // a print made of several canvases is priced per piece
 }
 function useCatalog(text){
   try{
@@ -747,7 +750,7 @@ const cartSubtotal = lines=>lines.reduce((a,l)=>a+(l.total||0),0);
 function cartMessage(lines){
   const sub=cartSubtotal(lines), off=promoOff(sub), quote=lines.some(l=>l.unit==null);
   return "Hello, I'd like to order these prints:\n\n"
-    +lines.map((l,k)=>`${k+1}. ${l.p.title}${whereText(l.p)?` (${whereText(l.p)})`:""}\nSize: ${l.sizeLabel}\nFinish: ${l.fin.label}\nQuantity: ${l.qty}\nPrice: ${l.total==null?"to be confirmed (custom size)":money(l.total)}\n${printLink(l.p.slug)}`).join("\n\n")
+    +lines.map((l,k)=>`${k+1}. ${l.p.title}${whereText(l.p)?` (${whereText(l.p)})`:""}\nSize: ${l.sizeLabel}\nFinish: ${l.fin.label}\nQuantity: ${l.qty}\nPrice: ${l.total==null?"to be confirmed (custom size)":money(l.total)+piecesText(l.p,l.qty,l.unit)}\n${printLink(l.p.slug)}`).join("\n\n")
     +`\n\nSubtotal: ${money(sub)}${quote?" + custom sizes":""}`
     +(off?`\nPromo code ${promoCode()} (${promoPct()}% off): ${money(sub-off)}`:"");
 }
@@ -759,6 +762,10 @@ function cartMessage(lines){
 const PROMO={percent:10,min:50};
 const promo=()=>{const p=store("jt-promo");return !p?null:typeof p==="string"?{code:p,percent:PROMO.percent,min:PROMO.min}:p};
 const promoCode=()=>promo()?.code||"";
+// Prints of several canvases (sheet column "pieces") are priced per piece: "$55 per piece", or "$165 for 3 pieces"
+const perPiece=p=>p&&p.pieces>1?`<span class="per"> per piece</span>`:"";
+const piecesNote=(p,qty)=>!p||p.pieces<2?"":qty>1?`<span class="per"> for ${qty} pieces</span>`:perPiece(p);
+const piecesText=(p,qty,unit)=>!p||p.pieces<2?"":qty>1?` (${qty} pieces × ${money(unit)})`:" per piece";
 const promoPct=()=>promo()?.percent||0;
 const promoOff=total=>{const p=promo();return p&&total>=p.min?Math.round(total*p.percent)/100:0};
 // Checks a typed code with the studio's list and keeps it on this device if it's valid
@@ -806,7 +813,7 @@ function card(p){
   const crop = box ? `onload="posterCrop(this,'${box.join(" ")}')"` : fit;
   return `<a class="pcard" href="#/print/${p.slug}">
     <div class="ph" style="--bg:url('${sized(im[0].src,200)}')"><img src="${sized(im[0].src,700)}" alt="${esc(im[0].alt)}" loading="lazy" ${crop}>${im[1]?`<img class="alt" src="${sized(im[1].src,500)}" alt="" loading="lazy" ${fit}>`:""}</div>
-    <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">${money(priceOf(defSize(p),DEFAULT_FINISH))}</p></a>`;
+    <h3>${esc(p.title)}</h3>${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}<p class="price">${money(priceOf(defSize(p),DEFAULT_FINISH))}${perPiece(p)}</p></a>`;
 }
 function collectionCovers(){
   // Match each collection to a different print (a proper matching, so a
@@ -1018,7 +1025,7 @@ function product(slug){
       <a class="small-link back" href="#/shop">← Back to prints</a>
       <h1>${esc(p.title)}</h1>
       ${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}
-      <p class="amount" id="amount">${money(priceOf(defSize(p),DEFAULT_FINISH))}</p>
+      <p class="amount" id="amount">${money(priceOf(defSize(p),DEFAULT_FINISH))}${perPiece(p)}</p>
       <p class="promo-line" id="promoLine" hidden></p>
       <p class="desc">${esc(p.desc)}</p>
       <form id="buy">
@@ -1091,7 +1098,7 @@ function cartPage(){
     return `<div class="cart-row"><a href="#/print/${l.p.slug}" class="ph"><img src="${sized(im[0].src,150)}" alt=""></a>
     <div><h3><a href="#/print/${l.p.slug}">${esc(l.p.title)}</a></h3><p class="meta">${esc(l.sizeLabel)}, ${esc(l.fin.label.toLowerCase())}</p>
       <div class="qty" style="display:inline-flex;margin-top:8px"><button data-cq="${i}" data-d="-1" aria-label="Decrease quantity">−</button><output>${it.qty}</output><button data-cq="${i}" data-d="1" aria-label="Increase quantity">+</button></div></div>
-    <div class="right">${l.total==null?"Price on request":money(l.total)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
+    <div class="right">${l.total==null?"Price on request":money(l.total)+piecesNote(l.p,l.qty)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
   <div class="cart-promo"><label for="promoIn">Promo code</label>
     <div class="promo-in"><input id="promoIn" placeholder="Enter your code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(promoCode())}"><button type="button" class="btn ghost" id="promoApply">Apply</button>${promoCode()?`<button type="button" class="btn ghost" id="promoRemove">Remove</button>`:""}</div>
     <p class="hint" id="promoMsg" role="status">${esc(cartPromoMsg||(!promoCode()?"":off?`Code ${promoCode()} applied: ${promoPct()}% off.`:`Your code ${promoCode()} takes ${promoPct()}% off orders from ${money(promo().min)}.`))}</p></div>
@@ -1226,7 +1233,7 @@ function bind(page,arg){
     const upd=()=>{const s=sel(),fi=FINISHES.find(x=>x.id===f.finish.value),cu=!!(s&&s.custom);
       $("#customDims").hidden=!cu;$("#amount").hidden=cu;
       const total=price()*qty, off=cu?0:promoOff(total), code=promoCode(), pl=$("#promoLine");
-      $("#amount").innerHTML=off?`<s>${money(total)}</s> ${money(total-off)}`:money(total);
+      $("#amount").innerHTML=(off?`<s>${money(total)}</s> ${money(total-off)}`:money(total))+piecesNote(p,qty);
       pl.hidden=!code||cu; pl.textContent=!code?"":off?`${promoPct()}% off with your code ${code}`:`Your code ${code} takes ${promoPct()}% off orders from ${money(promo().min)}`;
 $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show [data-fin]").forEach(d=>d.hidden=!fi||d.dataset.fin!==fi.id);$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);

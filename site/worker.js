@@ -640,9 +640,11 @@ async function catalogFeed(url, env) {
     const images = (p.images || p.image || p.photos || "").split(/\||\n|\s+(?=https?:)/).map(x => x.trim()).filter(Boolean).map(abs);
     const list = labels.map((l, i) => `${l}: ${Object.entries(FEED_FINISHES).map(([f, name]) => `$${price(i, f)} ${name.toLowerCase()}`).join(", ")}`).join("; ");
     const where = [p.place || p.location, p.year].filter(Boolean).join(", ");
+    const pieces = Math.max(1, parseInt(p.pieces || p.panels) || 1); // the sheet's "pieces" column, as on the site
     return {
       id: p.slug, title: p.title.replace(/\.$/, "").slice(0, 200),
-      description: [p.description || p.desc, where && `Photographed in ${where}.`, `Sizes and prices: ${list}. Custom sizes on request.`].filter(Boolean).join(" ").slice(0, 9000),
+      description: [p.description || p.desc, where && `Photographed in ${where}.`, pieces > 1 && `Made of ${pieces} pieces; prices are per piece.`,
+        `Sizes and prices${pieces > 1 ? " per piece" : ""}: ${list}. Custom sizes on request.`].filter(Boolean).join(" ").slice(0, 9000),
       availability: "in stock", condition: "new", price: `${price(Math.min(FEED_DEFAULT.size, labels.length - 1), FEED_DEFAULT.finish).toFixed(2)} USD`,
       link: `${SITE}/p/${encodeURIComponent(p.slug)}`, image_link: images[0] || "", additional_image_link: images.slice(1, 10).join(","),
       brand: "Just Framed",
