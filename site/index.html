@@ -1227,7 +1227,7 @@ function bind(page,arg){
       $("#customDims").hidden=!cu;$("#amount").hidden=cu;
       const total=price()*qty, off=cu?0:promoOff(total), code=promoCode(), pl=$("#promoLine");
       $("#amount").innerHTML=off?`<s>${money(total)}</s> ${money(total-off)}`:money(total);
-      pl.hidden=!code||cu; pl.textContent=off?`${promoPct()}% off with your code ${code}`:`Your code ${code} takes ${promoPct()}% off orders from ${money(promo().min)}`;
+      pl.hidden=!code||cu; pl.textContent=!code?"":off?`${promoPct()}% off with your code ${code}`:`Your code ${code} takes ${promoPct()}% off orders from ${money(promo().min)}`;
 $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show [data-fin]").forEach(d=>d.hidden=!fi||d.dataset.fin!==fi.id);$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
     document.querySelectorAll("#buyBox [data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
