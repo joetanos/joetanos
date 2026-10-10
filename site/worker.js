@@ -153,10 +153,14 @@ function uaInfo(ua) {
    Each subscriber gets a personal code for PROMO.percent off a first order from $PROMO.min,
    kept in the subscribers table (analytics/schema.sql). The code is emailed to email sign-ups
    when Cloudflare Email Sending is on for the domain (binding EMAIL); otherwise, and for phone
-   numbers, the page shows it. The studio gets an email for every sign-up, with a WhatsApp link
-   that sends the code to phone sign-ups in one tap. */
+   numbers, the page shows it. Phone sign-ups also get the code on WhatsApp from the studio's
+   number, through YCloud (secret YCLOUD_API_KEY) and the Meta-approved template WA.template; the
+   page shows the code as well, in case it doesn't arrive. The studio gets an email for every
+   sign-up, with a WhatsApp link that sends the code by hand if the automatic message failed. */
 const PROMO = { percent: 10, min: 50, prefix: "JF10-" }; // keep percent and min in sync with PROMO in index.html
 const NEWS_FROM = "newsletter@justframed-lb.com";
+// The template's one variable is the code. Changing its wording means a new template approved in YCloud.
+const WA = { from: "+96181874716", template: "newsletter_code", lang: "en_US" };
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
 async function subscribe(request, url, env, ctx) {
@@ -191,9 +195,12 @@ async function subscribe(request, url, env, ctx) {
   }
   const emailed = sub.kind === "email" && await sendCode(env, sub.contact, sub.code);
   if (emailed) ctx.waitUntil(env.DB.prepare("UPDATE subscribers SET emailed = 1 WHERE contact = ?").bind(sub.contact).run());
-  if (!again) ctx.waitUntil(notifyStudio(env, sub, emailed).catch(e => console.error("Sign-up email to the studio not sent", e)));
+  // Once per number, so typing someone's number again doesn't message them again
+  const whatsapped = sub.kind === "phone" && !sub.whatsapped && await whatsappCode(env, sub.contact, sub.code);
+  if (whatsapped) ctx.waitUntil(env.DB.prepare("UPDATE subscribers SET whatsapped = 1 WHERE contact = ?").bind(sub.contact).run());
+  if (!again) ctx.waitUntil(notifyStudio(env, sub, emailed, whatsapped).catch(e => console.error("Sign-up email to the studio not sent", e)));
   // When the code went by email it isn't shown, so only the owner of the address gets it
-  return json({ ok: true, kind: sub.kind, again, emailed, code: emailed ? null : sub.code, ...PROMO });
+  return json({ ok: true, kind: sub.kind, again, emailed, whatsapped: whatsapped || !!sub.whatsapped, code: emailed ? null : sub.code, ...PROMO });
 }
 
 // A subscriber's code, or one of the studio's own codes (promo_codes table: any percent, any
@@ -248,11 +255,32 @@ async function sendCode(env, to, code) {
   }
 }
 
-async function notifyStudio(env, sub, emailed) {
+// The code on WhatsApp, from the studio's number (YCloud's API sends Meta's approved template)
+async function whatsappCode(env, to, code) {
+  if (!env.YCLOUD_API_KEY) return false;
+  try {
+    const r = await fetch("https://api.ycloud.com/v2/whatsapp/messages/sendDirectly", {
+      method: "POST", headers: { "X-API-Key": env.YCLOUD_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: WA.from, to, type: "template", template: { name: WA.template, language: { code: WA.lang },
+        components: [{ type: "body", parameters: [{ type: "text", text: code }] }] } }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.status === "failed") { console.error("WhatsApp code not sent", r.status, JSON.stringify(j).slice(0, 500)); return false }
+    return true;
+  } catch (e) {
+    console.error("WhatsApp code not sent", e.message);
+    return false;
+  }
+}
+
+async function notifyStudio(env, sub, emailed, whatsapped) {
   const where = [sub.city, sub.country].filter(Boolean).join(", ");
   const msg = `Hello from Just Framed! Thank you for subscribing to our newsletter. ${promoText(sub.code)}`;
-  const link = sub.kind === "phone" ? `https://wa.me/${sub.contact.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
-  const how = sub.kind === "phone" ? "The code was shown on the website. Send it on WhatsApp too:" : emailed ? "The code was emailed to them." : "The code was shown on the website (Email Sending isn't on, so it wasn't emailed).";
+  const link = sub.kind === "phone" && !whatsapped ? `https://wa.me/${sub.contact.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
+  const how = sub.kind === "phone" ? (whatsapped ? "The code was sent to them on WhatsApp automatically, and shown on the website."
+      : "The code was shown on the website, but the automatic WhatsApp message didn't go out. Send it by hand:")
+    : emailed ? "The code was emailed to them." : "The code was shown on the website (Email Sending isn't on, so it wasn't emailed).";
   const html = `<!doctype html><html><body style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#1c1b18">
 <h2 style="font-size:18px;margin:0 0 12px">New newsletter subscriber</h2>
 <p style="margin:0 0 6px"><b>${esc(sub.contact)}</b>${where ? ` · ${esc(where)}` : ""}</p>
@@ -552,11 +580,11 @@ function promoCodesSheet(codes, coded, start) {
 }
 
 function subscribersSheet(subs, coded, country) {
-  const head = ["Signed up (Beirut)", "Email or phone", "Type", "Promo code", "Code emailed", "WhatsApp orders with the code", "Country", "City", "Language"];
+  const head = ["Signed up (Beirut)", "Email or phone", "Type", "Promo code", "Code sent (email or WhatsApp)", "Orders with the code", "Country", "City", "Language"];
   const used = code => coded.filter(e => (e.detail || "").includes(code)).length;
   return { name: "Subscribers", freeze: 1, filter: subs.length > 0, cols: [19, 32, 8, 14, 13, 16, 16, 16, 10],
     rows: [head.map(h => ({ v: h, s: "head" })), ...subs.map(s => [{ v: excelTime(s.ts), s: "date" }, s.contact, s.kind, s.code,
-      s.kind === "email" ? (s.emailed ? "Yes" : "No") : "", used(s.code), s.country ? country(s.country) : "", s.city, s.lang])] };
+      (s.kind === "email" ? s.emailed : s.whatsapped) ? "Yes" : "No", used(s.code), s.country ? country(s.country) : "", s.city, s.lang])] };
 }
 
 function eventsSheet(day, name) {

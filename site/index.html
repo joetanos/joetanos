@@ -1346,7 +1346,7 @@ function openNewsletter(){
         <button class="btn full" type="submit">Subscribe</button>
         <p class="err" role="alert"></p>
       </form>
-      <p class="fine">No spam. Unsubscribe any time.</p>
+      <p class="fine">By entering a phone number, you agree to receive WhatsApp messages from Just Framed. No spam. Unsubscribe any time.</p>
     </div></div>`;
   document.body.appendChild(nl);
   const box=nl.querySelector(".nl-box"), body=nl.querySelector(".nl-body"), back=document.activeElement, overflow=document.body.style.overflow;
@@ -1390,9 +1390,10 @@ function openNewsletter(){
         <div class="acts"><button type="button" class="btn full" data-close>Continue browsing</button></div>`;
     } else {
       // Phone numbers: a WhatsApp chat with the studio that holds the code, so it's kept in WhatsApp
-      const wa=j.kind==="phone"?waLink(`Hello Just Framed, I subscribed to the newsletter. My ${PROMO.percent}% code is ${j.code}.`):"";
+      // When the code didn't go out on WhatsApp automatically, a chat with the studio keeps it there
+      const wa=j.kind==="phone"&&!j.whatsapped?waLink(`Hello Just Framed, I subscribed to the newsletter. My ${PROMO.percent}% code is ${j.code}.`):"";
       body.innerHTML=`${kicker}<h2 id="nlTitle">Here's your ${PROMO.percent}% off</h2>
-        <p>Use this code on your first order of ${money(PROMO.min)} or more. It's saved on this device, so print pages apply it for you.</p>
+        <p>Use this code on your first order of ${money(PROMO.min)} or more. It's saved on this device, so print pages apply it for you.${j.whatsapped?" We've also sent it to you on WhatsApp.":""}</p>
         <p class="nl-code">${esc(j.code)}</p>
         <div class="acts">${wa?`<a class="btn full wa" href="${esc(wa)}" target="_blank" rel="noopener">${WA_ICON}Keep it in WhatsApp</a>`:""}
           <button type="button" class="btn full${wa?" ghost":""}" data-copy>Copy code</button>

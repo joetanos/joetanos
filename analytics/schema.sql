@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS subscribers (
   kind TEXT NOT NULL,           -- email or phone
   code TEXT NOT NULL UNIQUE,    -- personal promo code, e.g. JF10-7K3QX9
   emailed INTEGER DEFAULT 0,    -- 1 once the code was emailed to them
+  whatsapped INTEGER DEFAULT 0, -- 1 once the code was sent to them on WhatsApp (added later: ALTER TABLE subscribers ADD COLUMN whatsapped INTEGER DEFAULT 0)
   country TEXT, city TEXT, lang TEXT
 );
 
