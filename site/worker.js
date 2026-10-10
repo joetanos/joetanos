@@ -384,7 +384,7 @@ const PAGES = { home: "Home", shop: "Shop (all prints)", collections: "Collectio
   contact: "Contact", cart: "Cart", "poster-box": "Poster box" };
 // What the click statistics in index.html record
 const CLICKS = ["WhatsApp order", "Cart order", "WhatsApp", "Instagram", "Facebook", "Email", "Send message form", "Share print", "Zoom photo",
-  "Photo thumbnail", "Next/previous photo", "Zoom finish photo", "Sort", "Slideshow", "Print card", "Collection card", "Menu", "Previous/next print", "Footer", "Button", "Link", "Newsletter sign-up", "Newsletter closed", "Add to cart", "Cart"];
+  "Photo thumbnail", "Next/previous photo", "Zoom finish photo", "Sort", "Slideshow", "Print card", "Collection card", "Menu", "Previous/next print", "Footer", "Button", "Link", "Newsletter sign-up", "Newsletter closed", "Add to cart", "Cart", "Back to prints"];
 // What an order looks like in the report: one print, or everything in the cart (both are sent on WhatsApp)
 const orderText = (o, name) => o.target === "Cart order" ? "Cart: " + (o.detail || "").replace(/ \| /g, " · ")
   : [name(o.item), ...(o.detail ? o.detail.split(" | ") : [])].join(" · ");

@@ -239,6 +239,7 @@ footer a:hover{color:var(--ink)}
 .lb-count{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);color:#fff;font-family:var(--sans);font-size:11px;letter-spacing:.1em;opacity:.8}
 @media (hover:none){.lb-nav{display:none}}
 .pinfo{position:sticky;top:100px}
+.pinfo .back{margin-bottom:18px;padding:4px 0}
 .pinfo h1{font-size:clamp(24px,2.4vw,32px);margin-bottom:10px}
 .pinfo .where{font-style:italic;color:var(--muted);font-size:14px;margin-bottom:18px}
 .pinfo .amount{font-family:var(--sans);font-size:20px;margin-bottom:18px}
@@ -970,6 +971,7 @@ function product(slug){
       </nav>
     </div>
     <div class="pinfo">
+      <a class="small-link back" href="#/shop">← Back to prints</a>
       <h1>${esc(p.title)}</h1>
       ${whereText(p)?`<p class="where">${esc(whereText(p))}</p>`:""}
       <p class="amount" id="amount">${money(priceOf(defSize(p),DEFAULT_FINISH))}</p>
@@ -1425,6 +1427,7 @@ document.addEventListener("click",e=>{
   else if(el.id==="checkout"){x="Cart order";d=$("#cartSum")?.dataset.d}
   else if(el.id==="addCart"){x="Add to cart";d=["#sizeLbl","#finLbl","#qty"].map(s=>$(s).textContent.trim()).join(" | ")}
   else if(el.id==="cartLink") x="Cart";
+  else if(el.matches(".pinfo .back")) x="Back to prints";
   else if(el.closest(".gallery .stage")&&el.tagName==="IMG") x="Zoom photo";
   else if(el.closest(".gallery .thumbs")) x="Photo thumbnail";
   else if(el.closest(".gallery .gnav")) x="Next/previous photo";
