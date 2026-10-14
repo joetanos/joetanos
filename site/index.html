@@ -997,7 +997,7 @@ function collections(){
 
 function collection(slug){
   const c = COLLECTIONS.find(x=>x.slug===slug); if(!c) return notFound();
-  const list = PRINTS.filter(p=>p.collections.includes(slug));
+  const list = PRINTS.filter(p=>p.collections.includes(slug)).reverse(); // newest (last sheet row) first
   return `<div class="wrap"><div class="phead"><a class="small-link" href="#/collections">← Collections</a><h1 style="margin-top:18px">${esc(c.name)}</h1><p>${esc(c.blurb)}</p></div>
   <section class="block">${list.length?`<div class="grid4">${list.map(card).join("")}</div>`:`<p class="empty">No prints in this collection yet.</p>`}</section></div>`;
 }
