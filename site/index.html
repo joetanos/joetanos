@@ -18,6 +18,24 @@
 <meta property="og:image:alt" content="Just Framed logo between two framed prints">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="description" content="Limited-edition photographic prints of real places. Photographed on location and printed on archival cotton paper.">
+<!-- Meta Pixel Code (Facebook / Instagram ads). Meta's base code, except that fbevents.js loads only for
+     visitors who click Accept on the cookie banner: until then fbq() calls wait in its queue, and a Decline
+     drops them (pixelLoad and the "Ads pixel" section of the script below). Page views are sent by the
+     page itself on every #/ page change, so Meta's own history tracking is off (disablePushState).
+     No <noscript> image: it would count visitors who never accepted, and the site needs JavaScript anyway. -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];n.disablePushState=!0;n.allowDuplicatePageViews=!0;f.pixelLoad=function(){if(t)return;t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}}(window,document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1803011050839536');
+try{if(JSON.parse(localStorage.getItem("jt-cookie"))==="accept")pixelLoad()}catch(e){}
+</script>
+<!-- End Meta Pixel Code -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Herr+Von+Muellerhoff&display=swap" rel="stylesheet">
@@ -1248,6 +1266,7 @@ $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.
       const same=cart.find(x=>x.slug===it.slug&&x.si===it.si&&(x.dims||"")===it.dims&&x.finish===it.finish);
       if(same) same.qty=Math.min(99,same.qty+qty); else cart.push({...it,qty});
       saveCart();
+      pixel("AddToCart",pixelItem(p,s.custom?null:price()*qty,qty));
       h.innerHTML=`Added to your cart. <a href="#/cart">View cart (${cartCount()})</a>`};
     const pin=$("#promoIn"), pmsg=$("#promoMsg");
     $("#promoApply").onclick=async()=>{const v=pin.value.trim().toUpperCase();
@@ -1409,6 +1428,7 @@ function openNewsletter(){
       if(!r.ok||!j.ok) throw new Error(j.error||"Sign-up didn't go through. Please try again.");
       done=true; store("jt-nl",{done:1}); if(j.code) store("jt-promo",{code:j.code,percent:j.percent,min:j.min});
       stat("click",{x:"Newsletter sign-up"});
+      if(!j.again) pixel("Lead",{content_name:"Newsletter sign-up"});
       thanks(j,c);
     }catch(x){err.textContent=x instanceof TypeError?"No connection. Please try again.":x.message;btn.disabled=false;btn.textContent="Subscribe"}
   };
@@ -1446,7 +1466,7 @@ document.querySelectorAll("[data-ig]").forEach(a=>{a.href=igLink();a.target="_bl
 $("#logo").innerHTML=logoHTML(); $("#logo2").innerHTML=logoHTML();
 $(".menu-btn").onclick=e=>{const o=$("#nav").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",o)};
 if(!store("jt-cookie")) $("#cookie").hidden=false;
-document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-cookie",b.dataset.c);$("#cookie").hidden=true;statFlush()});
+document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-cookie",b.dataset.c);$("#cookie").hidden=true;statFlush();pixelConsent()});
 newsletter();
 /* ---------- Visit statistics ----------
    Records which pages are viewed and for how long, what is clicked and which sizes and finishes
@@ -1484,6 +1504,9 @@ function statView(page,arg){
   const pg=page||"home", i=arg?decodeURIComponent(arg):undefined;
   STAT.view={pg,i,p,start:Date.now()};
   stat("view",{pg,i});
+  pixel("PageView");
+  const pr=pg==="print"&&PRINTS.find(x=>x.slug===i);
+  if(pr) pixel("ViewContent",pixelItem(pr,priceOf(defSize(pr),DEFAULT_FINISH)));
 }
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="hidden"){statLeave();statFlush()}
@@ -1516,13 +1539,39 @@ document.addEventListener("click",e=>{
     item=hrefSlug(href); d=href.slice(1);
   }
   if(x) stat("click",{pg,i:item,x,d});
+  if(x==="Cart order") pixelCheckout();
+  else if(PIXEL_CONTACT.includes(x)) pixel("Contact",{content_name:x});
 },true);
 document.addEventListener("change",e=>{
   const el=e.target; if(!el.matches||!el.matches('input[name="size"],input[name="finish"]')) return;
   const lab=el.closest("label");
   stat("choose",{pg:"print",i:statPage().i,x:el.name,d:lab?lab.textContent.trim():el.value});
 });
-document.addEventListener("submit",e=>{if(e.target.closest("#main")) stat("click",{pg:statPage().pg,x:"Send message form"})},true);
+document.addEventListener("submit",e=>{if(e.target.closest("#main")){stat("click",{pg:statPage().pg,x:"Send message form"});pixel("Contact",{content_name:"Send message form"})}},true);
+
+/* ---------- Ads pixel ----------
+   Meta Pixel events for Facebook and Instagram ads (base code in <head>): PageView on every page,
+   ViewContent on a print page (priced at its preselected size and finish), AddToCart, InitiateCheckout
+   for "Order on WhatsApp" in the cart (the order itself is settled on WhatsApp, so there is no Purchase),
+   Lead for a newsletter sign-up and Contact for the studio's contact links and the message form.
+   The same consent rule as the statistics: events wait until the visitor chooses, Accept loads Meta's
+   script and sends them, Decline drops them. */
+const PIXEL_CONTACT=["WhatsApp","Instagram","Facebook","Email"];
+function pixel(ev,o){if(!STAT.on||statConsent()==="decline"||!window.fbq) return; o?fbq("track",ev,o):fbq("track",ev)}
+function pixelConsent(){
+  if(!window.fbq) return;
+  if(statConsent()==="accept") pixelLoad();
+  else fbq.queue=fbq.queue.filter(a=>a[0]!=="track");
+}
+// A print as Meta's ads see it; value is left out when the price isn't known (custom size)
+const pixelItem=(p,value,qty=1)=>({content_ids:[p.slug],content_name:p.title,content_type:"product",contents:[{id:p.slug,quantity:qty}],
+  ...(typeof value==="number"?{value,currency:"USD"}:{})});
+function pixelCheckout(){
+  const lines=cartLines(); if(!lines.length) return;
+  const sub=cartSubtotal(lines);
+  pixel("InitiateCheckout",{content_ids:[...new Set(lines.map(l=>l.p.slug))],content_type:"product",
+    contents:lines.map(l=>({id:l.p.slug,quantity:l.qty})),num_items:cartCount(),value:sub-promoOff(sub),currency:"USD"});
+}
 
 window.addEventListener("hashchange",route);
 window.addEventListener("scroll",()=>document.querySelector("header.site").classList.toggle("scrolled",scrollY>4),{passive:true});

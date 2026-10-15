@@ -119,6 +119,27 @@ node analytics/report.mjs --all      everything
 It writes an HTML report, a PDF copy and a CSV file for Excel into
 `analytics/reports/`.
 
+## Meta Pixel (Facebook and Instagram ads)
+
+The Meta Pixel (ID `1803011050839536`, in the `<head>` of `index.html`) tells
+Meta's Events Manager what visitors do, for ads and their results. Like the
+statistics, it only runs for visitors who click **Accept** on the cookie
+banner. It sends:
+
+- **PageView**: every page.
+- **ViewContent**: a print page, with the print, its id (`slug`) and its price
+  at the preselected size and finish.
+- **AddToCart**: "Add to cart", with the size and finish price × quantity.
+- **InitiateCheckout**: "Order on WhatsApp" in the cart, with the cart total
+  after any promo code. The order is finished on WhatsApp, so there is no
+  Purchase event.
+- **Lead**: a new newsletter sign-up.
+- **Contact**: the WhatsApp, Instagram, Facebook and email links, and the
+  message form.
+
+New prints are covered automatically. Check it's working in Events Manager →
+Test events, or with the Meta Pixel Helper Chrome extension.
+
 ## Custom domain
 Every option above lets you connect your own domain (e.g. joetanos.com) from
 its domain/DNS settings page.
