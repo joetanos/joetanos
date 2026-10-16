@@ -121,7 +121,7 @@ It writes an HTML report, a PDF copy and a CSV file for Excel into
 
 ## Meta Pixel (Facebook and Instagram ads)
 
-The Meta Pixel (ID `1803011050839536`, in the `<head>` of `index.html`) tells
+The Meta Pixel (ID `2413175742823876`, in the `<head>` of `index.html`) tells
 Meta's Events Manager what visitors do, for ads and their results. Like the
 statistics, it only runs for visitors who click **Accept** on the cookie
 banner. It sends:
