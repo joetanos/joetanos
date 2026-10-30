@@ -106,9 +106,9 @@ async function resized(request, url, env, ctx) {
   return out;
 }
 
-/* Visit statistics: the page sends {v: visitor id, s: visit id, r: referrer, e: [events]}
+/* Visit statistics: the page sends {v: visitor id, s: visit id, r: referrer, u: subscriber tag, e: [events]}
    (see "Visit statistics" in index.html). Country, city, device and browser are added here;
-   the IP address is not stored. */
+   the IP address is not stored. A subscriber's tag links the visitor id to them (subscriber_visitors). */
 const EVENT_TYPES = ["view", "leave", "click", "choose"];
 const BOTS = /bot|crawl|spider|slurp|preview|facebookexternalhit|whatsapp|telegram|headless|lighthouse|pingdom/i;
 
@@ -136,6 +136,10 @@ async function track(request, url, env, ctx) {
     Number.isFinite(Number(e.dur)) && e.dur != null ? Math.min(Math.max(0, Math.round(e.dur)), 3600000) : null,
     ...who));
   ctx.waitUntil(env.DB.batch(rows).catch(err => console.error("Visit statistics not saved", err)));
+  // Apart from the events, so they're saved even if this fails; only a tag that exists links
+  const vid = s(body.v, 40);
+  if (vid && TAG.test(body.u)) ctx.waitUntil(env.DB.prepare("INSERT OR IGNORE INTO subscriber_visitors (tag, vid, ts) SELECT tag, ?, ? FROM subscribers WHERE tag = ?")
+    .bind(vid, now, body.u).run().catch(err => console.error("Subscriber visitor not linked", err)));
   return done;
 }
 
@@ -157,11 +161,15 @@ function uaInfo(ua) {
    numbers, the page shows it. Phone sign-ups also get the code on WhatsApp from the studio's
    number, through YCloud (secret YCLOUD_API_KEY) and the Meta-approved template WA.template; the
    page shows the code as well, in case it doesn't arrive. The studio gets an email for every
-   sign-up, with a WhatsApp link that sends the code by hand if the automatic message failed. */
+   sign-up, with a WhatsApp link that sends the code by hand if the automatic message failed.
+   Each subscriber also has a private tag. The page keeps it once they sign up, enter their code or
+   open their personal link (/?s=<tag>), and sends it with the visit statistics, so the report
+   shows their visits. It's handed out with the code, never to someone who only typed an address. */
 const PROMO = { percent: 10, min: 50, prefix: "JF10-" }; // keep percent and min in sync with PROMO in index.html
 const NEWS_FROM = "newsletter@justframed-lb.com";
 // The template's one variable is the code. Changing its wording means a new template approved in YCloud.
 const WA = { from: "+96181874716", template: "newsletter_code", lang: "en_US" };
+const TAG = /^[0-9a-f]{10}$/; // as made by newTag and subscriber-tags.sql; keep in sync with index.html
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
 
 async function subscribe(request, url, env, ctx) {
@@ -182,11 +190,11 @@ async function subscribe(request, url, env, ctx) {
     if (n >= 500) return json({ error: "Too many sign-ups today. Please try again tomorrow." }, 429);
     const cf = request.cf || {};
     for (let i = 0; i < 3 && !sub; i++) {
-      sub = { ts: Date.now(), contact: contact.value, kind: contact.kind, code: newCode(), emailed: 0,
+      sub = { ts: Date.now(), contact: contact.value, kind: contact.kind, code: newCode(), tag: newTag(), emailed: 0,
         country: cf.country || null, city: cf.city || null, lang: request.headers.get("Accept-Language")?.split(/[,;]/)[0].slice(0, 20) || null };
       try {
-        await env.DB.prepare("INSERT INTO subscribers (ts, contact, kind, code, emailed, country, city, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(sub.ts, sub.contact, sub.kind, sub.code, 0, sub.country, sub.city, sub.lang).run();
+        await env.DB.prepare("INSERT INTO subscribers (ts, contact, kind, code, tag, emailed, country, city, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(sub.ts, sub.contact, sub.kind, sub.code, sub.tag, 0, sub.country, sub.city, sub.lang).run();
       } catch (e) {
         // Same code drawn twice (retry), or the same person signing up twice at once
         sub = await env.DB.prepare("SELECT * FROM subscribers WHERE contact = ?").bind(contact.value).first();
@@ -194,14 +202,16 @@ async function subscribe(request, url, env, ctx) {
     }
     if (!sub) return json({ error: "Sign-up didn't go through. Please try again." }, 500);
   }
-  const emailed = sub.kind === "email" && await sendCode(env, sub.contact, sub.code);
+  const emailed = sub.kind === "email" && await sendCode(env, sub.contact, sub.code, sub.tag);
   if (emailed) ctx.waitUntil(env.DB.prepare("UPDATE subscribers SET emailed = 1 WHERE contact = ?").bind(sub.contact).run());
   // Once per number, so typing someone's number again doesn't message them again
   const whatsapped = sub.kind === "phone" && !sub.whatsapped && await whatsappCode(env, sub.contact, sub.code);
   if (whatsapped) ctx.waitUntil(env.DB.prepare("UPDATE subscribers SET whatsapped = 1 WHERE contact = ?").bind(sub.contact).run());
   if (!again) ctx.waitUntil(notifyStudio(env, sub, emailed, whatsapped).catch(e => console.error("Sign-up email to the studio not sent", e)));
-  // When the code went by email it isn't shown, so only the owner of the address gets it
-  return json({ ok: true, kind: sub.kind, again, emailed, whatsapped: whatsapped || !!sub.whatsapped, code: emailed ? null : sub.code, ...PROMO });
+  // When the code went by email it isn't shown, so only the owner of the address gets it. The tag
+  // goes with it, and also to a new sign-up: an address typed again may be someone else's.
+  return json({ ok: true, kind: sub.kind, again, emailed, whatsapped: whatsapped || !!sub.whatsapped, code: emailed ? null : sub.code,
+    tag: again && emailed ? null : sub.tag, ...PROMO });
 }
 
 // A subscriber's code, or one of the studio's own codes (promo_codes table: any percent, any
@@ -209,8 +219,8 @@ async function subscribe(request, url, env, ctx) {
 async function promo(url, env) {
   const code = (url.searchParams.get("code") || "").trim().toUpperCase().slice(0, 30);
   if (!code || !env.DB) return json({ ok: false });
-  const sub = await env.DB.prepare("SELECT code FROM subscribers WHERE code = ?").bind(code).first();
-  if (sub) return json({ ok: true, code: sub.code, percent: PROMO.percent, min: PROMO.min });
+  const sub = await env.DB.prepare("SELECT code, tag FROM subscribers WHERE code = ?").bind(code).first();
+  if (sub) return json({ ok: true, code: sub.code, tag: sub.tag, percent: PROMO.percent, min: PROMO.min });
   const own = await env.DB.prepare("SELECT code, percent, min FROM promo_codes WHERE code = ? AND active = 1").bind(code).first().catch(() => null);
   return json(own ? { ok: true, code: own.code, percent: own.percent, min: own.min || 0 } : { ok: false });
 }
@@ -231,11 +241,17 @@ function newCode() {
   const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O or 1/I
   return PROMO.prefix + Array.from(crypto.getRandomValues(new Uint8Array(6)), b => abc[b % abc.length]).join("");
 }
+const newTag = () => Array.from(crypto.getRandomValues(new Uint8Array(5)), b => b.toString(16).padStart(2, "0")).join("");
+
+// A link to the site that tells the page who they are (see "Personal links" in index.html);
+// source shows in the report's "Came from"
+const personalLink = (tag, source, page = "#/shop") => `${SITE}/?${tag ? `s=${tag}&` : ""}utm_source=${encodeURIComponent(source)}${page}`;
 
 const promoText = code => `Your code ${code} takes ${PROMO.percent}% off your first order of $${PROMO.min} or more. Enter it on any print page, or mention it when you order on WhatsApp.`;
 
-async function sendCode(env, to, code) {
+async function sendCode(env, to, code, tag) {
   if (!env.EMAIL) return false;
+  const link = personalLink(tag, "Newsletter email");
   const html = `<!doctype html><html><body style="margin:0;background:#f5f2ed;font-family:Georgia,'Times New Roman',serif;color:#1c1b18">
 <div style="max-width:520px;margin:0 auto;padding:36px 24px;background:#fff">
 <p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#807a70;margin:0 0 12px">Just Framed newsletter</p>
@@ -243,12 +259,12 @@ async function sendCode(env, to, code) {
 <p style="font-size:16px;line-height:1.6;color:#57534b;margin:0 0 22px">Here is your code for ${PROMO.percent}% off your first order of $${PROMO.min} or more:</p>
 <p style="font-family:Helvetica,Arial,sans-serif;font-size:24px;letter-spacing:4px;text-align:center;border:1px dashed #ddd7cd;padding:16px;margin:0 0 22px">${code}</p>
 <p style="font-size:16px;line-height:1.6;color:#57534b;margin:0 0 26px">Enter it on any print page, or mention it when you order on WhatsApp. You'll also hear from us first about new prints, discounts and packages.</p>
-<a href="${SITE}/#/shop" style="display:inline-block;background:#1c1b18;color:#f5f2ed;font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:13px 20px;text-decoration:none">Browse the prints</a>
+<a href="${esc(link)}" style="display:inline-block;background:#1c1b18;color:#f5f2ed;font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:13px 20px;text-decoration:none">Browse the prints</a>
 <p style="font-size:13px;color:#807a70;margin:30px 0 0">To unsubscribe, just reply to this email.</p>
 </div></body></html>`;
   try {
     await env.EMAIL.send({ to, from: { email: NEWS_FROM, name: "Just Framed" }, replyTo: REPORT_TO,
-      subject: `Your ${PROMO.percent}% off code: ${code}`, html, text: `Thank you for subscribing to the Just Framed newsletter.\n\n${promoText(code)}\n\n${SITE}/#/shop\n\nTo unsubscribe, just reply to this email.` });
+      subject: `Your ${PROMO.percent}% off code: ${code}`, html, text: `Thank you for subscribing to the Just Framed newsletter.\n\n${promoText(code)}\n\n${link}\n\nTo unsubscribe, just reply to this email.` });
     return true;
   } catch (e) {
     console.error("Promo code email not sent", e.code || "", e.message);
@@ -277,7 +293,7 @@ async function whatsappCode(env, to, code) {
 
 async function notifyStudio(env, sub, emailed, whatsapped) {
   const where = [sub.city, sub.country].filter(Boolean).join(", ");
-  const msg = `Hello from Just Framed! Thank you for subscribing to our newsletter. ${promoText(sub.code)}`;
+  const msg = `Hello from Just Framed! Thank you for subscribing to our newsletter. ${promoText(sub.code)} ${personalLink(sub.tag, "WhatsApp")}`;
   const link = sub.kind === "phone" && !whatsapped ? `https://wa.me/${sub.contact.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}` : "";
   const how = sub.kind === "phone" ? (whatsapped ? "The code was sent to them on WhatsApp automatically, and shown on the website."
       : "The code was shown on the website, but the automatic WhatsApp message didn't go out. Send it by hand:")
@@ -288,8 +304,9 @@ async function notifyStudio(env, sub, emailed, whatsapped) {
 <p style="margin:0 0 16px">Promo code: <b>${sub.code}</b> (${PROMO.percent}% off a first order from $${PROMO.min})</p>
 <p style="margin:0 0 10px">${how}</p>
 ${link ? `<p><a href="${esc(link)}" style="display:inline-block;background:#1f9d55;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Send the code on WhatsApp</a></p>` : ""}
+<p style="margin:16px 0 0;color:#807a70;font-size:13px">Their personal link (use it in messages to them, so their visits show in the report):<br>${esc(personalLink(sub.tag, "Newsletter"))}</p>
 </body></html>`;
-  const text = `New newsletter subscriber: ${sub.contact}${where ? ` (${where})` : ""}\nPromo code: ${sub.code}\n${how}${link ? "\n" + link : ""}`;
+  const text = `New newsletter subscriber: ${sub.contact}${where ? ` (${where})` : ""}\nPromo code: ${sub.code}\n${how}${link ? "\n" + link : ""}\n\nTheir personal link: ${personalLink(sub.tag, "Newsletter")}`;
   const raw = mime({ from: `Just Framed website <${REPORT_FROM}>`, to: REPORT_TO, subject: `New subscriber: ${sub.contact}`, text, html });
   await env.MAILER.send(new EmailMessage(REPORT_FROM, REPORT_TO, raw));
 }
@@ -333,6 +350,14 @@ async function dailyReport(env, now, test, days = 1) {
   const { results: subs } = await env.DB.prepare("SELECT * FROM subscribers ORDER BY ts DESC").all().catch(() => ({ results: [] }));
   const { results: coded } = await env.DB.prepare("SELECT ts, detail FROM events WHERE target IN ('WhatsApp order', 'Cart order') AND detail LIKE '%code %'").all();
   const { results: ownCodes } = await env.DB.prepare("SELECT * FROM promo_codes ORDER BY percent, code").all().catch(() => ({ results: [] }));
+  // Subscribers' browsers, and what each subscriber did on them since the first visit recorded
+  const { results: links } = await env.DB.prepare("SELECT tag, vid FROM subscriber_visitors").all().catch(() => ({ results: [] }));
+  const { results: history } = await env.DB.prepare(`SELECT l.tag, COUNT(DISTINCT l.vid) devices, COUNT(DISTINCT e.sid) visits, SUM(e.type = 'view') views,
+    SUM(e.target IN ('WhatsApp order', 'Cart order')) orders, MIN(e.ts) first, MAX(e.ts) last FROM subscriber_visitors l JOIN events e ON e.vid = l.vid GROUP BY l.tag`).all().catch(() => ({ results: [] }));
+  const { results: seenPrints } = await env.DB.prepare(`SELECT l.tag, e.item, COUNT(*) n FROM subscriber_visitors l JOIN events e ON e.vid = l.vid
+    WHERE e.type = 'view' AND e.page = 'print' GROUP BY l.tag, e.item ORDER BY n DESC`).all().catch(() => ({ results: [] }));
+  const byTag = Object.fromEntries(subs.filter(s => s.tag).map(s => [s.tag, s]));
+  const subOf = {}; for (const l of links) if (byTag[l.tag]) subOf[l.vid] ||= byTag[l.tag];
   const newSubs = subs.filter(s => s.ts >= start && s.ts < end);
   const signups = [newSubs.length, subs.filter(s => s.ts >= start - 7 * days * DAY && s.ts < start).length];
   const day = ev.filter(e => e.ts >= start), before = ev.filter(e => e.ts < start);
@@ -352,6 +377,12 @@ async function dailyReport(env, now, test, days = 1) {
   const prints = count(views.filter(e => e.page === "print").map(e => e.item)).slice(0, 10).map(([slug, n]) => [name(slug), n,
     new Set(views.filter(e => e.item === slug).map(e => e.vid)).size, day.filter(e => e.item === slug && e.target === "WhatsApp order").length]);
   const orders = day.filter(e => ORDER_CLICKS.includes(e.target));
+  // Subscribers who came in the period, most active first
+  const subVisits = Object.values(day.reduce((o, e) => { const s = subOf[e.vid]; if (s) (o[s.tag] ||= { s, ev: [] }).ev.push(e); return o }, {})).map(({ s, ev }) => {
+    const v = ev.filter(e => e.type === "view");
+    const seen = count(v.filter(e => e.page === "print").map(e => e.item)).slice(0, 3).map(([slug, n]) => name(slug) + (n > 1 ? ` (${n})` : ""));
+    return [s.contact, new Set(ev.map(e => e.sid)).size, v.length, seen.join(", ") || "–", ev.filter(e => ORDER_CLICKS.includes(e.target)).length, ev.at(-1).ts];
+  }).sort((a, b) => b[2] - a[2]);
   const timeOf = ts => new Date(ts).toLocaleTimeString("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
   const dateText = new Date(end - 1).toLocaleDateString("en-GB", { timeZone: TZ, weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const avg = n => Math.round(n / 7 * 10) / 10;
@@ -382,25 +413,27 @@ async function dailyReport(env, now, test, days = 1) {
 ${tile("Visitors", today.visitors, prev.visitors)}${tile("Visits", today.visits, prev.visits)}${tile("Page views", today.views, prev.views)}${tile("WhatsApp orders", today.orders, prev.orders)}${tile("Shares", today.shares, prev.shares)}
 </tr></table>
 ${h2("New newsletter subscribers")}${table(["Time", "Email or phone", "Promo code", "From"], newSubs.map(s => [timeOf(s.ts), s.contact, s.code, [s.city, country(s.country)].filter(Boolean).join(", ")]))}
-${h2("WhatsApp orders")}${table(["Time", "Print · size · finish · qty · price", "From"], orders.map(o => [timeOf(o.ts), orderText(o, name), [o.city, country(o.country)].filter(Boolean).join(", ")]))}
+${h2("Subscribers who visited")}${table(["Email or phone", "Visits", "Page views", "Prints viewed", "Orders", "Last seen"], subVisits.map(r => [...r.slice(0, 5), timeOf(r[5])]))}
+${h2("WhatsApp orders")}${table(["Time", "Print · size · finish · qty · price", "From"], orders.map(o => [timeOf(o.ts), orderText(o, name) + (subOf[o.vid] ? ` (${subOf[o.vid].contact})` : ""), [o.city, country(o.country)].filter(Boolean).join(", ")]))}
 ${h2("Most viewed prints")}${table(["Print", "Views", "Visitors", "Orders"], prints)}
 ${h2("Where visitors came from")}${bars(visitsBy(e => e.ref || "Direct (typed or bookmarked)"))}
 ${h2("Countries")}${bars(visitsBy(e => country(e.country)))}
 ${h2("Devices")}${bars(visitsBy(e => e.device))}
 ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choose").map(e => e.detail)))}
-<p style="color:${muted};font-size:12px;margin-top:28px">Counts only visitors who accepted the cookie banner. The attached Excel file has a Statistics sheet (audience, pages, every print and collection opened or not, clicks, with charts) and an Events sheet with every event. For a full report with charts and navigation paths, run <code>node analytics/report.mjs</code>.</p>
+<p style="color:${muted};font-size:12px;margin-top:28px">Counts only visitors who accepted the cookie banner. A subscriber's visits show once their browser is linked to them: by signing up on it, entering their code or opening their personal link. The attached Excel file has a Statistics sheet (audience, pages, every print and collection opened or not, clicks, with charts) and an Events sheet with every event. For a full report with charts and navigation paths, run <code>node analytics/report.mjs</code>.</p>
 </div></body></html>`;
 
   const text = `Just Framed daily report, ${dateText} (${period}, until ${timeOf(end)})\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`
     + (newSubs.length ? "New newsletter subscribers:\n" + newSubs.map(s => `${timeOf(s.ts)}  ${s.contact}  ${s.code}`).join("\n") + "\n\n" : "")
-    + (orders.length ? "WhatsApp orders:\n" + orders.map(o => `${timeOf(o.ts)}  ${orderText(o, name)}`).join("\n") + "\n\n" : "")
+    + (subVisits.length ? "Subscribers who visited:\n" + subVisits.map(r => `${r[0]}  ${r[1]} visit${r[1] === 1 ? "" : "s"}, ${r[2]} page views${r[3] === "–" ? "" : `, saw ${r[3]}`}${r[4] ? `, ${r[4]} order${r[4] === 1 ? "" : "s"}` : ""}`).join("\n") + "\n\n" : "")
+    + (orders.length ? "WhatsApp orders:\n" + orders.map(o => `${timeOf(o.ts)}  ${orderText(o, name)}${subOf[o.vid] ? ` (${subOf[o.vid].contact})` : ""}`).join("\n") + "\n\n" : "")
     + (prints.length ? "Most viewed prints:\n" + prints.map(p => `${p[1]}  ${p[0]}`).join("\n") : "No print pages viewed today.");
 
   const book = await xlsx({ sheets: [
     statisticsSheet({ day, before, back, shop, name, country, signups, heading: `${dateText} · ${period}, until ${timeOf(end)}`, avgLabel }),
-    subscribersSheet(subs, coded, country),
+    subscribersSheet(subs, coded, country, history, seenPrints, name),
     promoCodesSheet(ownCodes, coded, start),
-    eventsSheet(day, name),
+    eventsSheet(day, name, subOf),
   ] });
 
   const stamp = new Date(end - 1).toLocaleDateString("en-CA", { timeZone: TZ });
@@ -570,7 +603,6 @@ function statisticsSheet({ day, before, back, shop, name, country, signups, head
   return { name: "Statistics", rows, charts, grid: false, cols: [44, 19, 16, 14, 14, 18, 14, 16, 3] };
 }
 
-// Everyone on the newsletter, newest first
 // The studio's own codes and how often each was in an order sent on WhatsApp
 function promoCodesSheet(codes, coded, start) {
   const head = ["Promo code", "Discount", "Minimum order ($)", "Active", "Orders with the code (this period)", "Orders with the code (all time)", "Note"];
@@ -580,18 +612,27 @@ function promoCodesSheet(codes, coded, start) {
       orders(c.code, start), orders(c.code), c.note || ""].map((v, i) => i === 1 ? { v, s: "pct" } : v))] };
 }
 
-function subscribersSheet(subs, coded, country) {
-  const head = ["Signed up (Beirut)", "Email or phone", "Type", "Promo code", "Code sent (email or WhatsApp)", "Orders with the code", "Country", "City", "Language"];
+// Everyone on the newsletter, newest first, with what each did on the site (all time, on every
+// browser linked to them) and their personal link
+function subscribersSheet(subs, coded, country, history, seenPrints, name) {
+  const head = ["Signed up (Beirut)", "Email or phone", "Type", "Promo code", "Code sent (email or WhatsApp)", "Orders with the code", "Country", "City", "Language",
+    "Visits", "Page views", "Order clicks", "First visit (Beirut)", "Last visit (Beirut)", "Devices", "Prints viewed (most first)", "Personal link"];
   const used = code => coded.filter(e => (e.detail || "").includes(code)).length;
-  return { name: "Subscribers", freeze: 1, filter: subs.length > 0, cols: [19, 32, 8, 14, 13, 16, 16, 16, 10],
-    rows: [head.map(h => ({ v: h, s: "head" })), ...subs.map(s => [{ v: excelTime(s.ts), s: "date" }, s.contact, s.kind, s.code,
-      (s.kind === "email" ? s.emailed : s.whatsapped) ? "Yes" : "No", used(s.code), s.country ? country(s.country) : "", s.city, s.lang])] };
+  const h = Object.fromEntries(history.map(r => [r.tag, r]));
+  const seen = {}; for (const r of seenPrints) (seen[r.tag] ||= []).push(name(r.item) + (r.n > 1 ? ` (${r.n})` : ""));
+  const date = ts => ts ? { v: excelTime(ts), s: "date" } : "";
+  return { name: "Subscribers", freeze: 1, filter: subs.length > 0, cols: [19, 32, 8, 14, 13, 16, 16, 16, 10, 8, 10, 11, 19, 19, 9, 60, 48],
+    rows: [head.map(h => ({ v: h, s: "head" })), ...subs.map(s => { const x = h[s.tag] || {};
+      return [{ v: excelTime(s.ts), s: "date" }, s.contact, s.kind, s.code,
+        (s.kind === "email" ? s.emailed : s.whatsapped) ? "Yes" : "No", used(s.code), s.country ? country(s.country) : "", s.city, s.lang,
+        x.visits || 0, x.views || 0, x.orders || 0, date(x.first), date(x.last), x.devices || 0, (seen[s.tag] || []).join(", "),
+        s.tag ? personalLink(s.tag, "Newsletter") : ""] })] };
 }
 
-function eventsSheet(day, name) {
-  const head = ["Time (Beirut)", "Visitor", "Visit", "Type", "Page", "Item", "Clicked or picked", "Detail", "Seconds", "Came from", "Country", "City", "Device", "Browser", "System", "Language"];
-  return { name: "Events", freeze: 1, filter: true, cols: [19, 14, 14, 8, 11, 30, 20, 34, 9, 22, 9, 16, 10, 16, 10, 10],
-    rows: [head.map(h => ({ v: h, s: "head" })), ...day.map(e => [{ v: excelTime(e.ts), s: "date" }, e.vid, e.sid, e.type, e.page,
+function eventsSheet(day, name, subOf) {
+  const head = ["Time (Beirut)", "Visitor", "Visit", "Subscriber", "Type", "Page", "Item", "Clicked or picked", "Detail", "Seconds", "Came from", "Country", "City", "Device", "Browser", "System", "Language"];
+  return { name: "Events", freeze: 1, filter: true, cols: [19, 14, 14, 28, 8, 11, 30, 20, 34, 9, 22, 9, 16, 10, 16, 10, 10],
+    rows: [head.map(h => ({ v: h, s: "head" })), ...day.map(e => [{ v: excelTime(e.ts), s: "date" }, e.vid, e.sid, subOf[e.vid]?.contact || "", e.type, e.page,
       e.page === "print" ? name(e.item) : e.item, e.target, e.detail, e.dur == null ? null : Math.round(e.dur / 1000), e.ref, e.country, e.city, e.device, e.browser, e.os, e.lang])] };
 }
 

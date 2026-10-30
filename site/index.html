@@ -792,6 +792,7 @@ const promoOff=total=>{const p=promo();return p&&total>=p.min?Math.round(total*p
 async function checkPromo(code){
   const j=await (await fetch("/promo?code="+encodeURIComponent(code))).json();
   if(j.ok) store("jt-promo",{code:j.code,percent:j.percent,min:j.min});
+  if(j.tag) store("jt-sub",j.tag); // a subscriber's own code: this browser's visits are theirs (see "Visit statistics")
   return j.ok?j.code:null;
 }
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("on"),2400)}
@@ -1396,7 +1397,7 @@ function openNewsletter(){
         <button class="btn full" type="submit">Subscribe</button>
         <p class="err" role="alert"></p>
       </form>
-      <p class="fine">By entering a phone number, you agree to receive WhatsApp messages from Just Framed. No spam. Unsubscribe any time.</p>
+      <p class="fine">By subscribing, you agree that we note your visits to this site, so our news and offers suit you. By entering a phone number, you agree to receive WhatsApp messages from Just Framed. No spam. Unsubscribe any time.</p>
     </div></div>`;
   document.body.appendChild(nl);
   const box=nl.querySelector(".nl-box"), body=nl.querySelector(".nl-body"), back=document.activeElement, overflow=document.body.style.overflow;
@@ -1429,6 +1430,7 @@ function openNewsletter(){
       const j=await r.json().catch(()=>({}));
       if(!r.ok||!j.ok) throw new Error(j.error||"Sign-up didn't go through. Please try again.");
       done=true; store("jt-nl",{done:1}); if(j.code) store("jt-promo",{code:j.code,percent:j.percent,min:j.min});
+      if(j.tag) store("jt-sub",j.tag);
       stat("click",{x:"Newsletter sign-up"});
       if(!j.again) pixel("Lead",{content_name:"Newsletter sign-up"});
       thanks(j,c);
@@ -1469,12 +1471,21 @@ $("#logo").innerHTML=logoHTML(); $("#logo2").innerHTML=logoHTML();
 $(".menu-btn").onclick=e=>{const o=$("#nav").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",o)};
 if(!store("jt-cookie")) $("#cookie").hidden=false;
 document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-cookie",b.dataset.c);$("#cookie").hidden=true;statFlush();pixelConsent()});
+/* Personal links: /?s=<tag> in messages to a subscriber (personalLink in worker.js). This browser is
+   theirs from now on (see "Visit statistics"), and the pop-up stays closed. The tag comes off the
+   address, so a link copied from the address bar doesn't pass it on. */
+{const q=new URLSearchParams(location.search), t=q.get("s");
+  if(t!==null){if(/^[0-9a-f]{10}$/.test(t)){store("jt-sub",t);store("jt-nl",{done:1})}
+    q.delete("s");history.replaceState(null,"",location.pathname+(q.toString()?"?"+q:"")+location.hash)}}
 newsletter();
 /* ---------- Visit statistics ----------
    Records which pages are viewed and for how long, what is clicked and which sizes and finishes
    are picked. worker.js (/t) saves it; analytics/report.mjs turns it into a report.
    Only for visitors who click Accept on the cookie banner: until they choose, events wait here
-   and are sent if they accept, dropped if they decline. No names or IP addresses are kept. */
+   and are sent if they accept, dropped if they decline. No IP addresses are kept. Visits are
+   anonymous, except on the browser of a newsletter subscriber: it keeps their private tag (jt-sub,
+   from signing up, their own promo code or their personal link) and sends it along, so the report
+   shows the visits as theirs, the ones from before the tag too. */
 const STAT={q:[], view:null, timer:null, ref:null, on:/^https?:$/.test(location.protocol)};
 const statConsent=()=>store("jt-cookie");
 const statId=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
@@ -1488,8 +1499,9 @@ function statFlush(){
   if(statConsent()!=="accept"||!STAT.q.length) return;
   let v=store("jt-vid"); if(!v){v=statId();store("jt-vid",v)}
   let sid; try{sid=sessionStorage.getItem("jt-sid")||statId();sessionStorage.setItem("jt-sid",sid)}catch(e){sid=STAT.sid=STAT.sid||statId()}
+  const u=store("jt-sub")||undefined;
   while(STAT.q.length){
-    const body=JSON.stringify({v,s:sid,r:STAT.ref,e:STAT.q.splice(0,30)});
+    const body=JSON.stringify({v,s:sid,r:STAT.ref,u,e:STAT.q.splice(0,30)});
     try{if(!navigator.sendBeacon("/t",new Blob([body],{type:"text/plain"})))fetch("/t",{method:"POST",body,keepalive:true})}catch(e){}
   }
 }
@@ -1497,6 +1509,10 @@ function statFlush(){
 STAT.ref=window.jfShared?"Shared print link"
   :new URLSearchParams(location.search).get("utm_source")
   ||(()=>{try{const r=new URL(document.referrer);return r.host===location.host?null:r.host.replace(/^www\./,"")}catch(e){return null}})();
+// Signed up on this browser before tags existed: the code it kept finds the tag (once)
+if(statConsent()==="accept"&&(store("jt-nl")||{}).done&&!store("jt-sub")&&promoCode()&&!store("jt-sub-asked")){
+  store("jt-sub-asked",1);checkPromo(promoCode()).catch(()=>{});
+}
 // Time on a page counts only while the tab is visible
 function statLeave(){const v=STAT.view;if(v&&v.start){stat("leave",{pg:v.pg,i:v.i,p:v.p,dur:Date.now()-v.start});v.start=0}}
 function statView(page,arg){

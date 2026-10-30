@@ -26,8 +26,22 @@ CREATE TABLE IF NOT EXISTS subscribers (
   code TEXT NOT NULL UNIQUE,    -- personal promo code, e.g. JF10-7K3QX9
   emailed INTEGER DEFAULT 0,    -- 1 once the code was emailed to them
   whatsapped INTEGER DEFAULT 0, -- 1 once the code was sent to them on WhatsApp (added later: ALTER TABLE subscribers ADD COLUMN whatsapped INTEGER DEFAULT 0)
-  country TEXT, city TEXT, lang TEXT
+  country TEXT, city TEXT, lang TEXT,
+  tag TEXT                      -- private id kept by their browser and in their personal link (/?s=<tag>); added later, see subscriber-tags.sql
 );
+CREATE UNIQUE INDEX IF NOT EXISTS subscribers_tag ON subscribers (tag);
+
+-- Which browsers (events.vid) belong to which subscriber (worker.js /t). A browser is linked once it
+-- sends the subscriber's tag: after signing up, entering their promo code or opening their personal
+-- link. All its visits, from before and after, then count as theirs.
+-- To forget someone: DELETE FROM subscriber_visitors WHERE tag = '<tag>'; DELETE FROM subscribers WHERE tag = '<tag>';
+CREATE TABLE IF NOT EXISTS subscriber_visitors (
+  tag TEXT NOT NULL,   -- subscribers.tag
+  vid TEXT NOT NULL,   -- events.vid
+  ts INTEGER NOT NULL, -- when the browser was linked, ms since 1970 (UTC)
+  PRIMARY KEY (tag, vid)
+);
+CREATE INDEX IF NOT EXISTS subscriber_visitors_vid ON subscriber_visitors (vid);
 
 -- The studio's own promo codes (worker.js /promo). Usable any number of times while active = 1.
 -- Add one:     INSERT INTO promo_codes (code, percent, min, note, created) VALUES ('NAME20-XXXX', 20, 0, 'what it is for', strftime('%s','now') * 1000);

@@ -107,7 +107,19 @@ When the site runs on Cloudflare, it records which pages people view and for
 how long, what they click (WhatsApp, share, photos…), which sizes and finishes
 they pick, and where they came from. This only applies to visitors who click
 **Accept** on the cookie banner. It's saved in the Cloudflare D1 database
-`justframed-analytics`. No names or IP addresses are kept.
+`justframed-analytics`. No IP addresses are kept.
+
+Visits are anonymous, except for newsletter subscribers. Each subscriber has a
+private tag. Their browser keeps it once they sign up on it, enter their promo
+code on it, or open their **personal link** (`https://justframed-lb.com/?s=<tag>…`).
+From then on, that browser's visits count as theirs, the earlier ones too. The
+daily report email lists the subscribers who visited. Its Excel file has each
+subscriber's visits, page views, prints viewed and personal link on the
+Subscribers sheet, and their name next to each event on the Events sheet.
+
+Put a subscriber's personal link (Subscribers sheet, last column) in the
+messages you send them. Then their visits show from any phone or computer
+they open it on, and "Came from" says Newsletter.
 
 To get a report, run this in the project folder (one level above this one).
 You need Node.js and a one-time `npx wrangler login`:

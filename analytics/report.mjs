@@ -40,6 +40,11 @@ for (let last = 0; ;) {
 events.sort((a, b) => a.ts - b.ts);
 console.log(`${events.length} events.`);
 
+// Newsletter subscribers' browsers (linked by worker.js /t): visitor id → email or phone
+const subOf = {};
+try { for (const r of d1("SELECT l.vid, s.contact FROM subscriber_visitors l JOIN subscribers s ON s.tag = l.tag ORDER BY l.ts")) subOf[r.vid] ||= r.contact }
+catch (e) { console.warn("Couldn't read the subscribers; their visits show as anonymous.") }
+
 // Print titles from the sheet (same slug rules as the site)
 const titles = {};
 try {
@@ -113,6 +118,14 @@ const prints = Object.entries(group(views.filter(v => v.page === "print"), v => 
   };
 }).sort((a, b) => b.views - a.views);
 
+// Subscribers who visited, most page views first
+const subVisits = Object.entries(group(S.filter(s => subOf[s.vid]), s => subOf[s.vid])).map(([who, ss]) => {
+  const vs = ss.flatMap(s => s.views);
+  const seen = Object.entries(count(vs.filter(v => v.page === "print").map(v => title(v.item)))).sort((a, b) => b[1] - a[1])
+    .slice(0, 5).map(([t, n]) => n > 1 ? `${t} (${n})` : t).join(", ");
+  return [who, ss.length, vs.length, seen || "–", ss.reduce((a, s) => a + s.orders, 0), longDate(Math.max(...ss.map(s => s.end)), true)];
+}).sort((a, b) => b[2] - a[2]);
+
 // Navigation
 const entries = count(S.map(s => pageLabel(s.views[0])));
 const exits = count(S.map(s => pageLabel(s.views.at(-1))));
@@ -164,6 +177,9 @@ ${columns(daily, "visits", d => `${longDate(d.d)}: ${d.visits} visits, ${d.visit
 <div class="scroll">${table(["Print", "Views", "Visitors", "Avg time", "Opened from home", "Photo browsing", "Shares", "WhatsApp orders", "Order rate", "Top size", "Top finish"],
   prints.map(p => [p.name, p.views, p.visitors, dur(p.time), p.opened, p.zooms, p.shares, p.orders, p.rate, p.size, p.finish]), true)}</div></div>
 
+<div class="card"><h2>Newsletter subscribers who visited</h2><p class="note">Visits on a browser linked to a subscriber: they signed up on it, entered their code or opened their personal link. Prints viewed = the five they opened most.</p>
+<div class="scroll">${table(["Subscriber", "Visits", "Page views", "Prints viewed", "WhatsApp orders", "Last visit"], subVisits, true)}</div></div>
+
 <div class="two">
 ${barCard("Pages viewed", count(views.map(pageLabel)), "Every page, by number of views.", 15)}
 ${barCard("Clicks", count(clicks.map(c => c.target)), "Buttons and links tapped.")}
@@ -211,8 +227,8 @@ const dir = join(ROOT, "analytics/reports");
 mkdirSync(dir, { recursive: true });
 const htmlPath = join(dir, `report-${stamp}.html`), csvPath = join(dir, `events-${stamp}.csv`), pdfPath = join(dir, `report-${stamp}.pdf`);
 writeFileSync(htmlPath, html);
-const cols = ["when", "visitor", "visit", "type", "page", "item", "target", "detail", "seconds", "came_from", "country", "city", "device", "browser", "os", "language"];
-writeFileSync(csvPath, "\ufeff" + [cols, ...events.map(e => [longDate(e.ts, true), e.vid, e.sid, e.type, e.page, e.page === "print" ? title(e.item) : e.item, e.target, e.detail,
+const cols = ["when", "visitor", "visit", "subscriber", "type", "page", "item", "target", "detail", "seconds", "came_from", "country", "city", "device", "browser", "os", "language"];
+writeFileSync(csvPath, "\ufeff" + [cols, ...events.map(e => [longDate(e.ts, true), e.vid, e.sid, subOf[e.vid] || "", e.type, e.page, e.page === "print" ? title(e.item) : e.item, e.target, e.detail,
   e.dur == null ? "" : Math.round(e.dur / 1000), e.ref, e.country, e.city, e.device, e.browser, e.os, e.lang])]
   .map(r => r.map(v => /[",\n]/.test(v ?? "") ? `"${String(v).replace(/"/g, '""')}"` : v ?? "").join(",")).join("\r\n"));
 const browser = ["C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
