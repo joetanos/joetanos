@@ -776,11 +776,15 @@ function cartMessage(lines){
 }
 /* ---------- Promo code ----------
    Newsletter subscribers get a personal code (newsletter pop-up below, /subscribe in worker.js) for
-   PROMO.percent off a first order from $PROMO.min. Keep in sync with PROMO in worker.js.
+   PROMO.percent off a first order (of $PROMO.min or more, when min isn't 0). Keep in sync with PROMO in worker.js.
    The studio's own codes (promo_codes table) have their own percent and minimum; /promo returns them.
-   The code in use is kept on the device as {code, percent, min} (a plain string is a newsletter code). */
-const PROMO={percent:10,min:50};
-const promo=()=>{const p=store("jt-promo");return !p?null:typeof p==="string"?{code:p,percent:PROMO.percent,min:PROMO.min}:p};
+   The code in use is kept on the device as {code, percent, min} (a plain string is a newsletter code).
+   A newsletter code always takes today's PROMO, even one kept under older terms. */
+const PROMO={percent:10,min:0,prefix:"JF10-"};
+const promo=()=>{const p=store("jt-promo");if(!p) return null;const code=typeof p==="string"?p:p.code;
+  return typeof p==="string"||code.startsWith(PROMO.prefix)?{code,percent:PROMO.percent,min:PROMO.min}:p};
+// " of $50 or more" when there is a minimum, else nothing
+const promoOver=min=>min?` of ${money(min)} or more`:"";
 const promoCode=()=>promo()?.code||"";
 // Prints of several canvases (sheet column "pieces") are priced per piece: "$55 per piece", or "$165 for 3 pieces"
 const perPiece=p=>p&&p.pieces>1?`<span class="per"> per piece</span>`:"";
@@ -1122,7 +1126,7 @@ function cartPage(){
     <div class="right">${l.total==null?"Price on request":money(l.total)+piecesNote(l.p,l.qty)}<br><button data-rm="${i}">Remove</button></div></div>`}).join("")}
   <div class="cart-promo"><label for="promoIn">Promo code</label>
     <div class="promo-in"><input id="promoIn" placeholder="Enter your code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(promoCode())}"><button type="button" class="btn ghost" id="promoApply">Apply</button>${promoCode()?`<button type="button" class="btn ghost" id="promoRemove">Remove</button>`:""}</div>
-    <p class="hint" id="promoMsg" role="status">${esc(cartPromoMsg||(!promoCode()?"":off?`Code ${promoCode()} applied: ${promoPct()}% off.`:`Your code ${promoCode()} takes ${promoPct()}% off orders from ${money(promo().min)}.`))}</p></div>
+    <p class="hint" id="promoMsg" role="status">${esc(cartPromoMsg||(!promoCode()?"":off?`Code ${promoCode()} applied: ${promoPct()}% off.`:`Your code ${promoCode()} takes ${promoPct()}% off orders${promoOver(promo().min)}.`))}</p></div>
   <div class="cart-foot"><div id="cartSum" data-d="${esc(summary)}"><p class="total">Subtotal ${money(sub)}</p>${off?`<p class="promo-off">${promoPct()}% off with code ${esc(promoCode())}: −${money(off)}</p><p class="total">Total ${money(sub-off)}</p>`:""}
     ${quote?`<p class="note">Custom sizes are priced by the studio when it replies.</p>`:""}<p class="note">Shipping is calculated when the studio confirms your order.</p></div>
   <div class="cart-acts"><a class="btn wa" id="checkout" href="${esc(waLink(cartMessage(lines)))}" target="_blank" rel="noopener">${WA_ICON}Order on WhatsApp</a><a class="small-link" href="#/shop">Continue shopping</a></div></div></div>`;
@@ -1255,7 +1259,7 @@ function bind(page,arg){
       $("#customDims").hidden=!cu;$("#amount").hidden=cu;
       const total=price()*qty, off=cu?0:promoOff(total), code=promoCode(), pl=$("#promoLine");
       $("#amount").innerHTML=(off?`<s>${money(total)}</s> ${money(total-off)}`:money(total))+piecesNote(p,qty);
-      pl.hidden=!code||cu; pl.textContent=!code?"":off?`${promoPct()}% off with your code ${code}`:`Your code ${code} takes ${promoPct()}% off orders from ${money(promo().min)}`;
+      pl.hidden=!code||cu; pl.textContent=!code?"":off?`${promoPct()}% off with your code ${code}`:`Your code ${code} takes ${promoPct()}% off orders${promoOver(promo().min)}`;
 $("#sizeLbl").textContent=s?sizeText(s):"Select";$("#finLbl").textContent=fi?fi.label:"Select";document.querySelectorAll(".finish-show [data-fin]").forEach(d=>d.hidden=!fi||d.dataset.fin!==fi.id);$("#hint").textContent=""};
     f.addEventListener("change",upd);f.addEventListener("input",upd);
     document.querySelectorAll("#buyBox [data-q]").forEach(b=>b.onclick=()=>{qty=Math.max(1,Math.min(10,qty+ +b.dataset.q));$("#qty").textContent=qty;upd()});
@@ -1390,7 +1394,7 @@ function openNewsletter(){
     <div class="nl-body">
       <p class="nl-kicker">Newsletter</p>
       <h2 id="nlTitle">${PROMO.percent}% off your first order</h2>
-      <p>Subscribe to our newsletter and get ${PROMO.percent}% off your first order starting ${money(PROMO.min)}. You'll also be the first to hear about new prints, discounts and packages.</p>
+      <p>Subscribe to our newsletter and get ${PROMO.percent}% off your first order${PROMO.min?` starting ${money(PROMO.min)}`:""}. You'll also be the first to hear about new prints, discounts and packages.</p>
       <form novalidate>
         <input name="c" type="text" inputmode="email" autocomplete="email" placeholder="Email or phone number" aria-label="Email or phone number">
         <div class="hp" aria-hidden="true"><input name="hp" tabindex="-1" autocomplete="off"></div>
@@ -1439,14 +1443,14 @@ function openNewsletter(){
   const thanks=(j,c)=>{
     const kicker=`<p class="nl-kicker">${j.again?"Already subscribed":"You're subscribed"}</p>`;
     if(j.emailed||!j.code){
-      body.innerHTML=`${kicker}<h2 id="nlTitle">Check your inbox</h2><p>We sent your ${PROMO.percent}% code to <b>${esc(c)}</b>. It works on your first order of ${money(PROMO.min)} or more.</p>
+      body.innerHTML=`${kicker}<h2 id="nlTitle">Check your inbox</h2><p>We sent your ${PROMO.percent}% code to <b>${esc(c)}</b>. It works on your first order${promoOver(PROMO.min)}.</p>
         <div class="acts"><button type="button" class="btn full" data-close>Continue browsing</button></div>`;
     } else {
       // Phone numbers: a WhatsApp chat with the studio that holds the code, so it's kept in WhatsApp
       // When the code didn't go out on WhatsApp automatically, a chat with the studio keeps it there
       const wa=j.kind==="phone"&&!j.whatsapped?waLink(`Hello Just Framed, I subscribed to the newsletter. My ${PROMO.percent}% code is ${j.code}.`):"";
       body.innerHTML=`${kicker}<h2 id="nlTitle">Here's your ${PROMO.percent}% off</h2>
-        <p>Use this code on your first order of ${money(PROMO.min)} or more. It's saved on this device, so print pages apply it for you.${j.whatsapped?" We've also sent it to you on WhatsApp.":""}</p>
+        <p>Use this code on your first order${promoOver(PROMO.min)}. It's saved on this device, so print pages apply it for you.${j.whatsapped?" We've also sent it to you on WhatsApp.":""}</p>
         <p class="nl-code">${esc(j.code)}</p>
         <div class="acts">${wa?`<a class="btn full wa" href="${esc(wa)}" target="_blank" rel="noopener">${WA_ICON}Keep it in WhatsApp</a>`:""}
           <button type="button" class="btn full${wa?" ghost":""}" data-copy>Copy code</button>

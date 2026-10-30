@@ -155,7 +155,7 @@ function uaInfo(ua) {
 
 /* ---------- Newsletter ----------
    The pop-up in index.html sends {c: email or phone number, hp: hidden field bots fill in}.
-   Each subscriber gets a personal code for PROMO.percent off a first order from $PROMO.min,
+   Each subscriber gets a personal code for PROMO.percent off a first order (from $PROMO.min when it isn't 0),
    kept in the subscribers table (analytics/schema.sql). The code is emailed to email sign-ups
    when Cloudflare Email Sending is on for the domain (binding EMAIL); otherwise, and for phone
    numbers, the page shows it. Phone sign-ups also get the code on WhatsApp from the studio's
@@ -165,7 +165,8 @@ function uaInfo(ua) {
    Each subscriber also has a private tag. The page keeps it once they sign up, enter their code or
    open their personal link (/?s=<tag>), and sends it with the visit statistics, so the report
    shows their visits. It's handed out with the code, never to someone who only typed an address. */
-const PROMO = { percent: 10, min: 50, prefix: "JF10-" }; // keep percent and min in sync with PROMO in index.html
+const PROMO = { percent: 10, min: 0, prefix: "JF10-" }; // keep in sync with PROMO in index.html; min 0 = any order
+const promoOver = () => PROMO.min ? ` of $${PROMO.min} or more` : "";
 const NEWS_FROM = "newsletter@justframed-lb.com";
 // The template's one variable is the code. Changing its wording means a new template approved in YCloud.
 const WA = { from: "+96181874716", template: "newsletter_code", lang: "en_US" };
@@ -247,7 +248,7 @@ const newTag = () => Array.from(crypto.getRandomValues(new Uint8Array(5)), b => 
 // source shows in the report's "Came from"
 const personalLink = (tag, source, page = "#/shop") => `${SITE}/?${tag ? `s=${tag}&` : ""}utm_source=${encodeURIComponent(source)}${page}`;
 
-const promoText = code => `Your code ${code} takes ${PROMO.percent}% off your first order of $${PROMO.min} or more. Enter it on any print page, or mention it when you order on WhatsApp.`;
+const promoText = code => `Your code ${code} takes ${PROMO.percent}% off your first order${promoOver()}. Enter it on any print page, or mention it when you order on WhatsApp.`;
 
 async function sendCode(env, to, code, tag) {
   if (!env.EMAIL) return false;
@@ -256,7 +257,7 @@ async function sendCode(env, to, code, tag) {
 <div style="max-width:520px;margin:0 auto;padding:36px 24px;background:#fff">
 <p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#807a70;margin:0 0 12px">Just Framed newsletter</p>
 <h1 style="font-size:28px;font-weight:normal;margin:0 0 14px">Thank you for subscribing</h1>
-<p style="font-size:16px;line-height:1.6;color:#57534b;margin:0 0 22px">Here is your code for ${PROMO.percent}% off your first order of $${PROMO.min} or more:</p>
+<p style="font-size:16px;line-height:1.6;color:#57534b;margin:0 0 22px">Here is your code for ${PROMO.percent}% off your first order${promoOver()}:</p>
 <p style="font-family:Helvetica,Arial,sans-serif;font-size:24px;letter-spacing:4px;text-align:center;border:1px dashed #ddd7cd;padding:16px;margin:0 0 22px">${code}</p>
 <p style="font-size:16px;line-height:1.6;color:#57534b;margin:0 0 26px">Enter it on any print page, or mention it when you order on WhatsApp. You'll also hear from us first about new prints, discounts and packages.</p>
 <a href="${esc(link)}" style="display:inline-block;background:#1c1b18;color:#f5f2ed;font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:13px 20px;text-decoration:none">Browse the prints</a>
@@ -301,7 +302,7 @@ async function notifyStudio(env, sub, emailed, whatsapped) {
   const html = `<!doctype html><html><body style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#1c1b18">
 <h2 style="font-size:18px;margin:0 0 12px">New newsletter subscriber</h2>
 <p style="margin:0 0 6px"><b>${esc(sub.contact)}</b>${where ? ` · ${esc(where)}` : ""}</p>
-<p style="margin:0 0 16px">Promo code: <b>${sub.code}</b> (${PROMO.percent}% off a first order from $${PROMO.min})</p>
+<p style="margin:0 0 16px">Promo code: <b>${sub.code}</b> (${PROMO.percent}% off a first order${promoOver()})</p>
 <p style="margin:0 0 10px">${how}</p>
 ${link ? `<p><a href="${esc(link)}" style="display:inline-block;background:#1f9d55;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Send the code on WhatsApp</a></p>` : ""}
 <p style="margin:16px 0 0;color:#807a70;font-size:13px">Their personal link (use it in messages to them, so their visits show in the report):<br>${esc(personalLink(sub.tag, "Newsletter"))}</p>
