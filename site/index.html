@@ -1548,8 +1548,9 @@ function statFlush(){
   }
 }
 // Where the visit came from: a shared print link, a campaign (?utm_source=…) or another site
-STAT.ref=window.jfShared?"Shared print link"
-  :new URLSearchParams(location.search).get("utm_source")
+// (a print link in a new release email is both: the campaign wins)
+STAT.ref=new URLSearchParams(location.search).get("utm_source")
+  ||(window.jfShared?"Shared print link":null)
   ||(()=>{try{const r=new URL(document.referrer);return r.host===location.host?null:r.host.replace(/^www\./,"")}catch(e){return null}})();
 // Signed up on this browser before tags existed: the code it kept finds the tag (once)
 if(statConsent()==="accept"&&(store("jt-nl")||{}).done&&!store("jt-sub")&&promoCode()&&!store("jt-sub-asked")){

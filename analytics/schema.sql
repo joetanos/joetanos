@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS subscribers (
   emailed INTEGER DEFAULT 0,    -- 1 once the code was emailed to them
   whatsapped INTEGER DEFAULT 0, -- 1 once the code was sent to them on WhatsApp (added later: ALTER TABLE subscribers ADD COLUMN whatsapped INTEGER DEFAULT 0)
   country TEXT, city TEXT, lang TEXT,
-  tag TEXT                      -- private id kept by their browser and in their personal link (/?s=<tag>); added later, see subscriber-tags.sql
+  tag TEXT,                     -- private id kept by their browser and in their personal link (/?s=<tag>); added later, see subscriber-tags.sql
+  unsubscribed INTEGER NOT NULL DEFAULT 0 -- 1: no new release messages (their email's link, or a WhatsApp STOP); added later, see announcements.sql
 );
 CREATE UNIQUE INDEX IF NOT EXISTS subscribers_tag ON subscribers (tag);
 
@@ -60,4 +61,25 @@ CREATE TABLE IF NOT EXISTS promo_codes (
   active INTEGER DEFAULT 1, -- 0 turns the code off
   note TEXT,               -- what the code is for
   created INTEGER          -- ms since 1970 (UTC)
+);
+
+-- New release announcements (worker.js announcements): prints marked yes in the sheet's announce column,
+-- sent once to the subscribers. To stop someone: UPDATE subscribers SET unsubscribed = 1 WHERE contact = '<email or +961…>';
+CREATE TABLE IF NOT EXISTS announced (
+  slug TEXT PRIMARY KEY,
+  ts INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS announcements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  prints TEXT NOT NULL,
+  done INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS announcement_sends (
+  announcement INTEGER NOT NULL,
+  sub INTEGER NOT NULL,
+  ts INTEGER NOT NULL,
+  ok INTEGER NOT NULL DEFAULT 0,
+  tries INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (announcement, sub)
 );

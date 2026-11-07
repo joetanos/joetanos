@@ -16,11 +16,13 @@ import { xlsx } from "./xlsx.js";
 const CATALOG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSqN9mnutNqWcd_N8J0_7H0kcn_sGsiIbF-ZNJnkYYgNFAPoR1wfc968rXAjQIBnmo4NiD3XAN7WZsh/pub?output=csv";
 
 export default {
-  // Daily visit report by email at 22:00 Beirut time. The crons (wrangler.jsonc) run at 19:00 and
-  // 20:00 UTC; only the one that is 22:00 in Beirut sends, so it follows summer and winter time.
+  // The cron (wrangler.jsonc) runs every 10 minutes. The daily visit report goes by email at 22:00
+  // Beirut time (the run at the start of that hour, so it follows summer and winter time);
+  // new release announcements are made and sent by announcements().
   async scheduled(event, env, ctx) {
-    if (beirutHour(event.scheduledTime) !== REPORT_HOUR) return;
-    ctx.waitUntil(dailyReport(env, event.scheduledTime));
+    const t = event.scheduledTime;
+    if (beirutHour(t) === REPORT_HOUR && new Date(t).getUTCMinutes() < 10) ctx.waitUntil(dailyReport(env, t));
+    ctx.waitUntil(announcements(env, t).catch(e => console.error("New release announcements", e)));
   },
 
   async fetch(request, env, ctx) {
@@ -32,6 +34,9 @@ export default {
     if (url.pathname === "/promo") return promo(url, env);
     if (url.pathname === "/catalog.csv") return catalogFeed(url, env, ctx);
     if (url.pathname === "/") return homePage(request, url, env, ctx);
+    if (url.pathname === "/unsubscribe") return unsubscribe(request, url, env);
+    const release = url.pathname.match(/^\/n\/([^/]*)\/?$/);
+    if (release) return releaseRedirect(url, release[1]);
     const m = url.pathname.match(/^\/p\/([^/]+)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
@@ -50,7 +55,8 @@ export default {
         // Run before anything else loads: relative links resolve from the site root,
         // and the address bar shows the normal print page.
         // jfShared tells the visit statistics that this visit came from a shared link.
-        el.prepend(`<base href="/"><script>history.replaceState(null,"","/#/print/${encodeURIComponent(slug)}");window.jfShared=1</script>${consentScript(request)}`, { html: true });
+        // The query (a subscriber's ?s= tag, ?utm_source=) stays, for the page to read.
+        el.prepend(`<base href="/"><script>history.replaceState(null,"","/"+location.search+"#/print/${encodeURIComponent(slug)}");window.jfShared=1</script>${consentScript(request)}`, { html: true });
         if (sheet) el.append(catalogScript(sheet), { html: true });
       }})
       .on("title", { element(el) { el.setInnerContent(title) } })
@@ -426,6 +432,10 @@ async function dailyReport(env, now, test, days = 1) {
   const byTag = Object.fromEntries(subs.filter(s => s.tag).map(s => [s.tag, s]));
   const subOf = {}; for (const l of links) if (byTag[l.tag]) subOf[l.vid] ||= byTag[l.tag];
   const newSubs = subs.filter(s => s.ts >= start && s.ts < end);
+  // New release announcements sent in the period, by WhatsApp and by email
+  const { results: released } = await env.DB.prepare(`SELECT s.kind, SUM(x.ok) ok, COUNT(*) n FROM announcement_sends x JOIN subscribers s ON s.id = x.sub
+    WHERE x.ts >= ? AND x.ts < ? GROUP BY s.kind`).bind(start, end).all().catch(() => ({ results: [] }));
+  const releasedRows = released.map(r => [r.kind === "phone" ? "WhatsApp" : "Email", r.ok, r.n - r.ok]);
   const signups = [newSubs.length, subs.filter(s => s.ts >= start - 7 * days * DAY && s.ts < start).length];
   const day = ev.filter(e => e.ts >= start), before = ev.filter(e => e.ts < start);
   const stats = list => {
@@ -479,6 +489,7 @@ async function dailyReport(env, now, test, days = 1) {
 <table cellpadding="0" cellspacing="0" style="width:100%;margin:0 -6px"><tr>
 ${tile("Visitors", today.visitors, prev.visitors)}${tile("Visits", today.visits, prev.visits)}${tile("Page views", today.views, prev.views)}${tile("WhatsApp orders", today.orders, prev.orders)}${tile("Shares", today.shares, prev.shares)}
 </tr></table>
+${releasedRows.length ? h2("New release announcement") + table(["Sent by", "Reached", "Not reached (tried again later)"], releasedRows) : ""}
 ${h2("New newsletter subscribers")}${table(["Time", "Email or phone", "Promo code", "From"], newSubs.map(s => [timeOf(s.ts), s.contact, s.code, [s.city, country(s.country)].filter(Boolean).join(", ")]))}
 ${h2("Subscribers who visited")}${table(["Email or phone", "Visits", "Page views", "Prints viewed", "Orders", "Last seen"], subVisits.map(r => [...r.slice(0, 5), timeOf(r[5])]))}
 ${h2("WhatsApp orders")}${table(["Time", "Print · size · finish · qty · price", "From"], orders.map(o => [timeOf(o.ts), orderText(o, name) + (subOf[o.vid] ? ` (${subOf[o.vid].contact})` : ""), [o.city, country(o.country)].filter(Boolean).join(", ")]))}
@@ -492,6 +503,7 @@ ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choos
 
   const text = `Just Framed daily report, ${dateText} (${period}, until ${timeOf(end)})\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`
     + (newSubs.length ? "New newsletter subscribers:\n" + newSubs.map(s => `${timeOf(s.ts)}  ${s.contact}  ${s.code}`).join("\n") + "\n\n" : "")
+    + (releasedRows.length ? "New release announcement:\n" + releasedRows.map(r => `${r[0]}: ${r[1]} reached${r[2] ? `, ${r[2]} not reached yet` : ""}`).join("\n") + "\n\n" : "")
     + (subVisits.length ? "Subscribers who visited:\n" + subVisits.map(r => `${r[0]}  ${r[1]} visit${r[1] === 1 ? "" : "s"}, ${r[2]} page views${r[3] === "–" ? "" : `, saw ${r[3]}`}${r[4] ? `, ${r[4]} order${r[4] === 1 ? "" : "s"}` : ""}`).join("\n") + "\n\n" : "")
     + (orders.length ? "WhatsApp orders:\n" + orders.map(o => `${timeOf(o.ts)}  ${orderText(o, name)}${subOf[o.vid] ? ` (${subOf[o.vid].contact})` : ""}`).join("\n") + "\n\n" : "")
     + (prints.length ? "Most viewed prints:\n" + prints.map(p => `${p[1]}  ${p[0]}`).join("\n") : "No print pages viewed today.");
@@ -708,6 +720,145 @@ function excelTime(ts) {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit",
     minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ts)).map(x => [x.type, Number(x.value)]));
   return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) / DAY + 25569;
+}
+
+/* ---------- New release announcements ----------
+   Prints marked yes in the sheet's "announce" column are announced to the newsletter subscribers,
+   once. Every day at ANNOUNCE_HOUR (Beirut) the prints marked since the last time become one
+   announcement: one message listing them all. The crons (every 10 minutes) then send it, SEND_BATCH
+   at a time and only between SEND_HOURS, by WhatsApp (YCloud, Meta's template new_release) or by
+   email. A send that fails is tried again an hour later, for up to 3 days (e.g. while Email Sending
+   isn't on yet). Unsubscribed subscribers (the email's link, or a STOP reply on WhatsApp entered by
+   hand) are left out. Tables: announced, announcements, announcement_sends (analytics/schema.sql). */
+const ANNOUNCE_HOUR = 18, SEND_HOURS = [10, 21], SEND_BATCH = 40, RETRY_FOR = 3 * 86400000, HOUR = 3600000;
+const WA_RELEASE = { template: "new_release", lang: "en_US" };
+const isYes = v => /^(yes|y|true|1|x|✓|✔)$/i.test(String(v || "").trim());
+// "📍 A, B and C", or the first four and "and 6 more"; WhatsApp allows no line breaks in it
+function releaseNames(prints) {
+  const t = prints.map(p => p.title.replace(/\s+/g, " "));
+  const list = t.length > 5 ? [...t.slice(0, 4), `${t.length - 4} more`] : t;
+  return "📍 " + (list.length > 1 ? list.slice(0, -1).join(", ") + " and " + list.at(-1) : list[0]);
+}
+const releaseLink = (tag, via) => `${SITE}/n/${tag || "-"}${via === "email" ? "?via=email" : ""}`;
+
+async function announcements(env, now) {
+  const hour = beirutHour(now);
+  if (hour === ANNOUNCE_HOUR && new Date(now).getUTCMinutes() < 10) await newAnnouncement(env, now);
+  if (hour >= SEND_HOURS[0] && hour < SEND_HOURS[1]) await sendAnnouncements(env, now);
+}
+
+async function newAnnouncement(env, now) {
+  const marked = (await catalog(env, SITE)).filter(p => isYes(p.announce));
+  if (!marked.length) return;
+  const { results } = await env.DB.prepare("SELECT slug FROM announced").all();
+  const seen = new Set(results.map(r => r.slug)), fresh = marked.filter(p => !seen.has(p.slug));
+  if (!fresh.length) return;
+  // Claimed first, so the same prints can never go into two announcements
+  const claimed = await env.DB.batch(fresh.map(p => env.DB.prepare("INSERT OR IGNORE INTO announced (slug, ts) VALUES (?, ?)").bind(p.slug, now)));
+  const prints = fresh.filter((p, i) => claimed[i].meta.changes).map(p => {
+    const image = (p.images || p.image || p.photos || "").split(/\||\n|\s+(?=https?:)/).map(x => x.trim()).filter(Boolean)[0];
+    return { slug: p.slug, title: p.title.replace(/\.$/, ""), place: [p.place || p.location, p.year].filter(Boolean).join(", "), image: image ? new URL(image, SITE).href : "" };
+  });
+  if (!prints.length) return;
+  await env.DB.prepare("INSERT INTO announcements (ts, prints, done) VALUES (?, ?, 0)").bind(now, JSON.stringify(prints)).run();
+  const { n } = await env.DB.prepare("SELECT COUNT(*) n FROM subscribers WHERE unsubscribed = 0").first();
+  const text = `The new release announcement is going out to ${n} subscriber${n === 1 ? "" : "s"} (WhatsApp and email), a few dozen every 10 minutes:\n\n${prints.map(p => "- " + p.title).join("\n")}\n\nWhatsApp message: ${releaseNames(prints)}\n\nTomorrow's daily report shows how many were reached.`;
+  await env.MAILER.send(new EmailMessage(REPORT_FROM, REPORT_TO, mime({ from: `Just Framed website <${REPORT_FROM}>`, to: REPORT_TO,
+    subject: `New release announcement: ${prints.length} print${prints.length === 1 ? "" : "s"} to ${n} subscriber${n === 1 ? "" : "s"}`, text,
+    html: `<pre style="font:14px/1.5 Helvetica,Arial,sans-serif;white-space:pre-wrap">${esc(text)}</pre>` }))).catch(e => console.error("Announcement notice not sent", e.message));
+}
+
+async function sendAnnouncements(env, now) {
+  const { results: open } = await env.DB.prepare("SELECT * FROM announcements WHERE done = 0 ORDER BY id").all();
+  let left = SEND_BATCH;
+  for (const a of open) {
+    const retry = now - a.ts < RETRY_FOR ? 1 : 0;
+    // Subscribers (who had signed up by then) not reached yet: never tried, or failed over an hour ago
+    const pending = `FROM subscribers s LEFT JOIN announcement_sends x ON x.announcement = ?1 AND x.sub = s.id
+      WHERE s.unsubscribed = 0 AND s.ts <= ?2 AND (x.sub IS NULL OR (x.ok = 0 AND ?3 = 1))`;
+    const { results: subs } = left ? await env.DB.prepare(`SELECT s.id, s.contact, s.kind, s.tag ${pending} AND (x.sub IS NULL OR x.ts < ?4) LIMIT ?5`)
+      .bind(a.id, a.ts, retry, now - HOUR, left).all() : { results: [] };
+    const prints = JSON.parse(a.prints);
+    for (const s of subs) {
+      left--;
+      await env.DB.prepare(`INSERT INTO announcement_sends (announcement, sub, ts, ok, tries) VALUES (?, ?, ?, 0, 1)
+        ON CONFLICT (announcement, sub) DO UPDATE SET ts = excluded.ts, tries = tries + 1`).bind(a.id, s.id, now).run();
+      const ok = s.kind === "phone" ? await whatsappRelease(env, s, prints) : await emailRelease(env, s, prints);
+      if (ok) await env.DB.prepare("UPDATE announcement_sends SET ok = 1 WHERE announcement = ? AND sub = ?").bind(a.id, s.id).run();
+    }
+    const { n } = await env.DB.prepare(`SELECT COUNT(*) n ${pending}`).bind(a.id, a.ts, retry).first();
+    if (!n) await env.DB.prepare("UPDATE announcements SET done = 1 WHERE id = ?").bind(a.id).run();
+    if (!left) break;
+  }
+}
+
+async function whatsappRelease(env, sub, prints) {
+  if (!env.YCLOUD_API_KEY) return false;
+  try {
+    const r = await fetch("https://api.ycloud.com/v2/whatsapp/messages/sendDirectly", {
+      method: "POST", headers: { "X-API-Key": env.YCLOUD_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: WA.from, to: sub.contact, type: "template", template: { name: WA_RELEASE.template, language: { code: WA_RELEASE.lang },
+        components: [{ type: "body", parameters: [{ type: "text", text: releaseNames(prints) }] },
+          { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: sub.tag || "-" }] }] } }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.status === "failed") { console.error("Release WhatsApp not sent", r.status, JSON.stringify(j).slice(0, 500)); return false }
+    return true;
+  } catch (e) {
+    console.error("Release WhatsApp not sent", e.message);
+    return false;
+  }
+}
+
+async function emailRelease(env, sub, prints) {
+  if (!env.EMAIL) return false;
+  const one = prints.length === 1, all = releaseLink(sub.tag, "email"), unsub = `${SITE}/unsubscribe?t=${sub.tag || ""}`;
+  const printLink = p => `${SITE}/p/${encodeURIComponent(p.slug)}?${sub.tag ? `s=${sub.tag}&` : ""}utm_source=${encodeURIComponent("New release email")}`;
+  const photo = p => p.image ? `${SITE}/img?u=${encodeURIComponent(p.image)}&w=1200` : "";
+  const html = `<!doctype html><html><body style="margin:0;background:#f5f2ed;font-family:Georgia,'Times New Roman',serif;color:#1c1b18">
+<div style="max-width:560px;margin:0 auto;padding:36px 24px;background:#fff">
+<p style="font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#807a70;margin:0 0 12px">Just Framed · new release</p>
+<h1 style="font-size:28px;font-weight:normal;margin:0 0 14px">${one ? "A new print just arrived" : "New prints just arrived"}</h1>
+<p style="font-size:16px;line-height:1.6;color:#57534b;margin:0 0 26px">Hello! Have a look and tell us which one you'd hang on your wall.</p>
+${prints.map(p => `<a href="${esc(printLink(p))}" style="display:block;text-decoration:none;color:#1c1b18;margin:0 0 28px">
+${photo(p) ? `<img src="${esc(photo(p))}" alt="${esc(p.title)}" width="512" style="display:block;width:100%;max-width:512px;height:auto;border:0;margin:0 0 10px">` : ""}
+<span style="display:block;font-size:19px">${esc(p.title)}</span>${p.place ? `<span style="display:block;font-size:14px;color:#807a70;margin-top:2px">${esc(p.place)}</span>` : ""}</a>`).join("")}
+<a href="${esc(all)}" style="display:inline-block;background:#1c1b18;color:#f5f2ed;font-family:Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:13px 20px;text-decoration:none">See ${one ? "it" : "them"} on the site</a>
+<p style="font-size:13px;color:#807a70;margin:30px 0 0">You're receiving this because you subscribed to the Just Framed newsletter. <a href="${esc(unsub)}" style="color:#807a70">Unsubscribe</a></p>
+</div></body></html>`;
+  const text = `${one ? "A new print just arrived" : "New prints just arrived"} at Just Framed:\n\n${prints.map(p => `${p.title}${p.place ? ` (${p.place})` : ""}\n${printLink(p)}`).join("\n\n")}\n\nSee ${one ? "it" : "them"} on the site: ${all}\n\nUnsubscribe: ${unsub}`;
+  try {
+    await env.EMAIL.send({ to: sub.contact, from: { email: NEWS_FROM, name: "Just Framed" }, replyTo: REPORT_TO,
+      subject: one ? `New at Just Framed: ${prints[0].title}` : `New prints at Just Framed: ${prints.slice(0, 2).map(p => p.title).join(", ")}${prints.length > 2 ? " and more" : ""}`, html, text });
+    return true;
+  } catch (e) {
+    console.error("Release email not sent", e.code || "", e.message);
+    return false;
+  }
+}
+
+/* /n/<tag>: the "See the new prints" button. Opens All prints (newest first) with the subscriber's tag,
+   so the visit is theirs in the reports. ?via=email when it comes from the email. */
+function releaseRedirect(url, tag) {
+  const via = url.searchParams.get("via") === "email" ? "New release email" : "New release WhatsApp";
+  return Response.redirect(`${SITE}/?${TAG.test(tag) ? `s=${tag}&` : ""}utm_source=${encodeURIComponent(via)}#/shop`, 302);
+}
+
+// /unsubscribe?t=<tag>: the email's link shows a button (so link scanners can't unsubscribe anyone), which posts here
+async function unsubscribe(request, url, env) {
+  const tag = url.searchParams.get("t") || "";
+  const page = (title, body) => new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)} – Just Framed</title><meta name="robots" content="noindex"></head><body style="margin:0;background:#f5f2ed;font-family:Georgia,'Times New Roman',serif;color:#1c1b18">
+<div style="max-width:520px;margin:60px auto;padding:36px 24px;background:#fff"><h1 style="font-size:26px;font-weight:normal;margin:0 0 14px">${esc(title)}</h1>${body}
+<p style="margin:26px 0 0"><a href="${SITE}" style="color:#57534b">Back to Just Framed</a></p></div></body></html>`, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+  if (!TAG.test(tag) || !env.DB) return page("Link not recognised", `<p style="color:#57534b">To unsubscribe, reply to any of our emails or write to ${REPORT_TO}.</p>`);
+  if (request.method === "POST") {
+    await env.DB.prepare("UPDATE subscribers SET unsubscribed = 1 WHERE tag = ?").bind(tag).run();
+    return page("You're unsubscribed", `<p style="color:#57534b">You won't receive new release emails or messages from us any more. Your promo code still works.</p>`);
+  }
+  return page("Unsubscribe", `<p style="color:#57534b">Stop receiving new release emails and messages from Just Framed?</p>
+<form method="post"><button style="background:#1c1b18;color:#f5f2ed;border:0;padding:13px 20px;font:11px Helvetica,Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;cursor:pointer">Unsubscribe</button></form>`);
 }
 
 function mime({ from, to, subject, text, html, attachment }) {
