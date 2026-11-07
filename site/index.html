@@ -137,6 +137,11 @@ nav.main a{opacity:.75}nav.main a:hover,nav.main a[aria-current="page"]{opacity:
 .hero-stage:has(.hero-slide.pair){background:transparent}
 .hero-slide.pair img.fill{display:none}
 #heroCap{transition:opacity .4s}
+/* Until the first page is drawn (route), the main area fills the screen, so the footer starts out
+   of sight instead of being pushed down when the page appears */
+#main.booting{min-height:100vh}
+/* The slideshow caption changes every few seconds: room for two lines, so a longer one doesn't push the text below down */
+#heroCap{min-height:3.3em}
 .caption{font-style:italic;font-size:12px;color:var(--muted);margin-bottom:26px}
 h1,h2,h3{font-family:var(--sans);font-weight:500;letter-spacing:-.02em;line-height:1.08}
 .hero h1{font-size:clamp(34px,3.6vw,52px);margin-bottom:26px}
@@ -431,7 +436,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
   </div>
 </header>
 
-<main id="main"></main>
+<main id="main" class="booting"></main>
 
 <footer class="site">
   <div class="wrap">
@@ -966,6 +971,10 @@ function bindSortMenu(prints=wallPrints){
 }
 // A click anywhere outside the sort menu closes it
 document.addEventListener("click",e=>{const m=$("#sortMenu");if(m&&!m.hidden&&!e.target.closest(".sort")){m.hidden=true;$("#sortBtn").setAttribute("aria-expanded","false")}});
+/* Whether each print's slide shows two photos side by side, as worked out the last time its photos
+   loaded (bind). A slide starts in that layout, or as one photo (the usual case: both landscape),
+   so it doesn't jump when the photos arrive. */
+const HERO_PAIRS=store("jt-hero-pairs")||{};
 function heroCaption(p){return esc(p.title.replace(/\.$/,""))+(whereText(p)?" – "+esc(whereText(p)):"")}
 let heroTimer=null;
 function home(){
@@ -974,7 +983,7 @@ function home(){
   <section class="hero" aria-roledescription="carousel" aria-label="Featured prints">
     <div class="ph hero-stage">
       ${heroSlides().map((p,i)=>{const im=printImages(p), main=sized(im[0].src,Math.min(1400,innerWidth*1.5));
-        return `<a class="hero-slide${i?"":" on"}${im[1]?" pair":""}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${main}" alt=""><span class="pair-wrap"><img class="fit main"${heroFocus(p)} ${i?"data-":""}src="${main}" alt="${esc(p.title)}, framed on a wall">${im[1]?`<img class="fit second" ${i?"data-":""}src="${sized(im[1].src,Math.min(700,innerWidth))}" alt="${esc(im[1].alt)}">`:""}</span></a>`}).join("")}
+        return `<a class="hero-slide${i?"":" on"}${im[1]&&HERO_PAIRS[p.slug]?" pair":""}" href="#/print/${p.slug}" aria-hidden="${i?"true":"false"}" tabindex="${i?-1:0}"><img class="fill" ${i?"data-":""}src="${main}" alt=""><span class="pair-wrap"><img class="fit main"${heroFocus(p)} ${i?"data-":""}src="${main}" alt="${esc(p.title)}, framed on a wall">${im[1]?`<img class="fit second" ${i?"data-":""}src="${sized(im[1].src,Math.min(700,innerWidth))}" alt="${esc(im[1].alt)}">`:""}</span></a>`}).join("")}
     </div>
     <div class="copy">
       <p class="caption" id="heroCap" aria-live="polite">${heroCaption(heroSlides()[0])}</p>
@@ -1201,7 +1210,7 @@ function route(){
   else if(page==="cart"){html=cartPage();title="Cart — Just Framed"}
   else if(page==="poster-box"){html=posterTool();title="Poster box — Just Framed"}
   else html=notFound();
-  $("#main").innerHTML=html; document.title=title; window.scrollTo(0,0);
+  $("#main").innerHTML=html; $("#main").classList.remove("booting"); document.title=title; window.scrollTo(0,0);
   document.querySelectorAll("nav.main a").forEach(a=>{const h=a.getAttribute("href").slice(2);a.toggleAttribute("aria-current",page===h||(h==="shop"&&page==="print")||(h==="collections"&&page==="collection"));if(a.hasAttribute("aria-current"))a.setAttribute("aria-current","page")});
   $("#cartLink").toggleAttribute("aria-current",page==="cart");
   $("#nav").classList.remove("open");$(".menu-btn").setAttribute("aria-expanded","false");
@@ -1219,7 +1228,9 @@ function bind(page,arg){
     // then crop the room photo to its print (heroAuto)
     slides.forEach((sl,k)=>{const ims=[...sl.querySelectorAll(".pair-wrap img")], main=ims[0];
       const check=()=>{if(!ims.every(im=>im.complete&&im.naturalWidth)) return;
-        if(ims.length>1) sl.classList.toggle("pair",!ims.every(im=>im.naturalWidth>im.naturalHeight));
+        if(ims.length>1){const pair=!ims.every(im=>im.naturalWidth>im.naturalHeight);
+          sl.classList.toggle("pair",pair);
+          if(!!HERO_PAIRS[list[k].slug]!==pair){HERO_PAIRS[list[k].slug]=pair;store("jt-hero-pairs",HERO_PAIRS)}}
         heroAuto(main,list[k])};
       ims.forEach(im=>im.addEventListener("load",check)); check()});
     const load=k=>{const sl=slides[(k+slides.length)%slides.length];
