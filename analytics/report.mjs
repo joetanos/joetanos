@@ -197,7 +197,7 @@ ${barCard("Most common next steps", steps, "From one page to the next.", 12)}
 ${barCard("Most common journeys", paths, "First pages of visits with two or more pages.", 12)}
 </div>
 <div class="two">
-${barCard("Where visitors came from", count(S.map(s => s.ref || "Direct (typed or bookmarked)")), "Other sites, shared print links and campaigns.")}
+${barCard("Where visitors came from", count(S.map(cameFrom)), "Other sites, shared print links and campaigns.")}
 ${barCard("Countries", count(S.map(s => countryName(s.country))), "By visit.")}
 </div>
 <div class="two">
@@ -229,7 +229,7 @@ const htmlPath = join(dir, `report-${stamp}.html`), csvPath = join(dir, `events-
 writeFileSync(htmlPath, html);
 const cols = ["when", "visitor", "visit", "subscriber", "type", "page", "item", "target", "detail", "seconds", "came_from", "country", "city", "device", "browser", "os", "language"];
 writeFileSync(csvPath, "\ufeff" + [cols, ...events.map(e => [longDate(e.ts, true), e.vid, e.sid, subOf[e.vid] || "", e.type, e.page, e.page === "print" ? title(e.item) : e.item, e.target, e.detail,
-  e.dur == null ? "" : Math.round(e.dur / 1000), e.ref, e.country, e.city, e.device, e.browser, e.os, e.lang])]
+  e.dur == null ? "" : Math.round(e.dur / 1000), cameFrom(e), e.country, e.city, e.device, e.browser, e.os, e.lang])]
   .map(r => r.map(v => /[",\n]/.test(v ?? "") ? `"${String(v).replace(/"/g, '""')}"` : v ?? "").join(",")).join("\r\n"));
 const browser = ["C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome", "/usr/bin/chromium"].find(existsSync);
@@ -240,6 +240,21 @@ if (browser) {
 console.log(`Report: ${htmlPath}${existsSync(pdfPath) ? `\nPDF:    ${pdfPath}` : ""}\nExcel:  ${csvPath}`);
 
 /* ---------- Helpers ---------- */
+/* Where a visit came from, in plain words (same as cameFrom in site/worker.js, keep in sync).
+   ref is what the page recorded: a shared print link, the link's utm_source or the other site.
+   Instagram and Facebook often hide the site, so their apps' own browsers decide when ref says nothing.
+   fb, ig, msg and an are what Meta puts in an ad's link ({{site_source_name}}). */
+function cameFrom(e) {
+  const AD_SOURCES = { fb: "Facebook ad", ig: "Instagram ad", msg: "Messenger ad", an: "Audience Network ad" };
+  const ref = String(e.ref || "").trim(), low = ref.toLowerCase();
+  const app = e.browser === "Instagram app" ? "Instagram" : e.browser === "Facebook app" ? "Facebook" : null;
+  if (AD_SOURCES[low]) return AD_SOURCES[low];
+  if (/^(eventsmanager|business|adsmanager)\.facebook\.com$/.test(low)) return "Meta business tools (your own tests)";
+  if (low === "instagram" || /(^|\.)instagram\.com$/.test(low)) return "Instagram";
+  if (low === "facebook" || /(^|\.)(facebook\.com|fb\.com|fb\.me)$/.test(low)) return app || "Facebook";
+  if (low === "--sanitized--" || low === "meta") return app || "Facebook / Instagram"; // the tag hidden by the app
+  return ref || app || "Direct (typed or bookmarked)";
+}
 function count(list) { const o = {}; for (const k of list) if (k != null && k !== "") o[k] = (o[k] || 0) + 1; return o }
 function group(list, f) { const o = {}; for (const x of list) (o[f(x)] ||= []).push(x); return o }
 function top(list) { const c = Object.entries(count(list)).sort((a, b) => b[1] - a[1]); return c.length ? c[0][0] : "" }

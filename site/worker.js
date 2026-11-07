@@ -163,6 +163,23 @@ async function track(request, url, env, ctx) {
   return done;
 }
 
+/* Where a visit came from, in plain words, for the reports. ref is what the page recorded (a shared
+   print link, the link's utm_source or the other site's address). Instagram and Facebook often hide
+   the site a visitor came from, so their apps' own browsers decide when ref says nothing.
+   fb, ig, msg and an are what Meta puts in an ad's link ({{site_source_name}}).
+   Keep in sync with cameFrom in analytics/report.mjs */
+const AD_SOURCES = { fb: "Facebook ad", ig: "Instagram ad", msg: "Messenger ad", an: "Audience Network ad" };
+function cameFrom(e) {
+  const ref = String(e.ref || "").trim(), low = ref.toLowerCase();
+  const app = e.browser === "Instagram app" ? "Instagram" : e.browser === "Facebook app" ? "Facebook" : null;
+  if (AD_SOURCES[low]) return AD_SOURCES[low];
+  if (/^(eventsmanager|business|adsmanager)\.facebook\.com$/.test(low)) return "Meta business tools (your own tests)";
+  if (low === "instagram" || /(^|\.)instagram\.com$/.test(low)) return "Instagram";
+  if (low === "facebook" || /(^|\.)(facebook\.com|fb\.com|fb\.me)$/.test(low)) return app || "Facebook";
+  if (low === "--sanitized--" || low === "meta") return app || "Facebook / Instagram"; // the tag hidden by the app
+  return ref || app || "Direct (typed or bookmarked)";
+}
+
 function uaInfo(ua) {
   const device = /iPad|Tablet/i.test(ua) ? "Tablet" : /Mobi|Android|iPhone/i.test(ua) ? "Mobile" : "Desktop";
   const browser = /Instagram/.test(ua) ? "Instagram app" : /FBAN|FBAV/.test(ua) ? "Facebook app" : /Edg\//.test(ua) ? "Edge"
@@ -437,7 +454,7 @@ ${h2("New newsletter subscribers")}${table(["Time", "Email or phone", "Promo cod
 ${h2("Subscribers who visited")}${table(["Email or phone", "Visits", "Page views", "Prints viewed", "Orders", "Last seen"], subVisits.map(r => [...r.slice(0, 5), timeOf(r[5])]))}
 ${h2("WhatsApp orders")}${table(["Time", "Print · size · finish · qty · price", "From"], orders.map(o => [timeOf(o.ts), orderText(o, name) + (subOf[o.vid] ? ` (${subOf[o.vid].contact})` : ""), [o.city, country(o.country)].filter(Boolean).join(", ")]))}
 ${h2("Most viewed prints")}${table(["Print", "Views", "Visitors", "Orders"], prints)}
-${h2("Where visitors came from")}${bars(visitsBy(e => e.ref || "Direct (typed or bookmarked)"))}
+${h2("Where visitors came from")}${bars(visitsBy(cameFrom))}
 ${h2("Countries")}${bars(visitsBy(e => country(e.country)))}
 ${h2("Devices")}${bars(visitsBy(e => e.device))}
 ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choose").map(e => e.detail)))}
@@ -566,7 +583,7 @@ function statisticsSheet({ day, before, back, shop, name, country, signups, head
   };
   audience("Country", e => e.country && country(e.country));
   audience("City", e => e.city && `${e.city}, ${country(e.country)}`);
-  audience("Came from", e => e.ref || "Direct (typed or bookmarked)", { by: "where they came from" });
+  audience("Came from", cameFrom, { by: "where they came from" });
   audience("New or returning", e => returning.has(e.vid) ? "Returning" : "New", { all: ["New", "Returning"], by: "new or returning visitors" });
   audience("Device", e => e.device, { all: ["Mobile", "Desktop", "Tablet"] });
   audience("Phone or computer system", e => e.os);
@@ -654,7 +671,7 @@ function eventsSheet(day, name, subOf) {
   const head = ["Time (Beirut)", "Visitor", "Visit", "Subscriber", "Type", "Page", "Item", "Clicked or picked", "Detail", "Seconds", "Came from", "Country", "City", "Device", "Browser", "System", "Language"];
   return { name: "Events", freeze: 1, filter: true, cols: [19, 14, 14, 28, 8, 11, 30, 20, 34, 9, 22, 9, 16, 10, 16, 10, 10],
     rows: [head.map(h => ({ v: h, s: "head" })), ...day.map(e => [{ v: excelTime(e.ts), s: "date" }, e.vid, e.sid, subOf[e.vid]?.contact || "", e.type, e.page,
-      e.page === "print" ? name(e.item) : e.item, e.target, e.detail, e.dur == null ? null : Math.round(e.dur / 1000), e.ref, e.country, e.city, e.device, e.browser, e.os, e.lang])] };
+      e.page === "print" ? name(e.item) : e.item, e.target, e.detail, e.dur == null ? null : Math.round(e.dur / 1000), cameFrom(e), e.country, e.city, e.device, e.browser, e.os, e.lang])] };
 }
 
 // Excel's date number for a time, as the clock showed it in Beirut
