@@ -731,6 +731,9 @@ function excelTime(ts) {
    isn't on yet). Unsubscribed subscribers (the email's link, or a STOP reply on WhatsApp entered by
    hand) are left out. Tables: announced, announcements, announcement_sends (analytics/schema.sql). */
 const ANNOUNCE_HOUR = 18, SEND_HOURS = [10, 21], SEND_BATCH = 40, RETRY_FOR = 3 * 86400000, HOUR = 3600000;
+// Off: the studio chose not to email subscribers (Email Sending needs the Workers Paid plan). true sends
+// new releases to email subscribers too (emailRelease), once Email Sending is on for the domain.
+const RELEASE_BY_EMAIL = false, RELEASE_TO = RELEASE_BY_EMAIL ? "" : "AND kind = 'phone'";
 const WA_RELEASE = { template: "new_release", lang: "en_US" };
 const isYes = v => /^(yes|y|true|1|x|✓|✔)$/i.test(String(v || "").trim());
 // "📍 A, B and C", or the first four and "and 6 more"; WhatsApp allows no line breaks in it
@@ -761,8 +764,8 @@ async function newAnnouncement(env, now) {
   });
   if (!prints.length) return;
   await env.DB.prepare("INSERT INTO announcements (ts, prints, done) VALUES (?, ?, 0)").bind(now, JSON.stringify(prints)).run();
-  const { n } = await env.DB.prepare("SELECT COUNT(*) n FROM subscribers WHERE unsubscribed = 0").first();
-  const text = `The new release announcement is going out to ${n} subscriber${n === 1 ? "" : "s"} (WhatsApp and email), a few dozen every 10 minutes:\n\n${prints.map(p => "- " + p.title).join("\n")}\n\nWhatsApp message: ${releaseNames(prints)}\n\nTomorrow's daily report shows how many were reached.`;
+  const { n } = await env.DB.prepare(`SELECT COUNT(*) n FROM subscribers WHERE unsubscribed = 0 ${RELEASE_TO}`).first();
+  const text = `The new release announcement is going out to ${n} subscriber${n === 1 ? "" : "s"} (${RELEASE_BY_EMAIL ? "WhatsApp and email" : "by WhatsApp"}), a few dozen every 10 minutes:\n\n${prints.map(p => "- " + p.title).join("\n")}\n\nWhatsApp message: ${releaseNames(prints)}\n\nTomorrow's daily report shows how many were reached.`;
   await env.MAILER.send(new EmailMessage(REPORT_FROM, REPORT_TO, mime({ from: `Just Framed website <${REPORT_FROM}>`, to: REPORT_TO,
     subject: `New release announcement: ${prints.length} print${prints.length === 1 ? "" : "s"} to ${n} subscriber${n === 1 ? "" : "s"}`, text,
     html: `<pre style="font:14px/1.5 Helvetica,Arial,sans-serif;white-space:pre-wrap">${esc(text)}</pre>` }))).catch(e => console.error("Announcement notice not sent", e.message));
@@ -775,7 +778,7 @@ async function sendAnnouncements(env, now) {
     const retry = now - a.ts < RETRY_FOR ? 1 : 0;
     // Subscribers (who had signed up by then) not reached yet: never tried, or failed over an hour ago
     const pending = `FROM subscribers s LEFT JOIN announcement_sends x ON x.announcement = ?1 AND x.sub = s.id
-      WHERE s.unsubscribed = 0 AND s.ts <= ?2 AND (x.sub IS NULL OR (x.ok = 0 AND ?3 = 1))`;
+      WHERE s.unsubscribed = 0 ${RELEASE_TO.replace("kind", "s.kind")} AND s.ts <= ?2 AND (x.sub IS NULL OR (x.ok = 0 AND ?3 = 1))`;
     const { results: subs } = left ? await env.DB.prepare(`SELECT s.id, s.contact, s.kind, s.tag ${pending} AND (x.sub IS NULL OR x.ts < ?4) LIMIT ?5`)
       .bind(a.id, a.ts, retry, now - HOUR, left).all() : { results: [] };
     const prints = JSON.parse(a.prints);
