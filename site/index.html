@@ -20,9 +20,10 @@
 <meta name="description" content="Limited-edition photographic prints of real places. Photographed on location and printed on archival cotton paper.">
 <!-- Proves to Meta (Business Settings → Domains) that justframed-lb.com is Just Framed's -->
 <meta name="facebook-domain-verification" content="p4lu5h9vva9o5t6pj5b2zydejlg18l">
-<!-- Meta Pixel Code (Facebook / Instagram ads). Meta's base code, except that fbevents.js loads only for
-     visitors who click Accept on the cookie banner: until then fbq() calls wait in its queue, and a Decline
-     drops them (pixelLoad and the "Ads pixel" section of the script below). Page views are sent by the
+<!-- Meta Pixel Code (Facebook / Instagram ads). Meta's base code, except that fbevents.js loads only with
+     consent (statConsent below): visitors in Europe and the UK are asked first with the cookie banner,
+     others aren't asked (worker.js sets window.jfAsk=0) but can turn it off on the Privacy page. Until then
+     fbq() calls wait in its queue, and a Decline drops them (pixelLoad and the "Ads pixel" section below). Page views are sent by the
      page itself on every #/ page change, so Meta's own history tracking is off (disablePushState).
      No <noscript> image: it would count visitors who never accepted, and the site needs JavaScript anyway. -->
 <script>
@@ -35,7 +36,7 @@ t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}}(window,document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
 fbq('init', '2413175742823876');
-try{if(JSON.parse(localStorage.getItem("jt-cookie"))==="accept")pixelLoad()}catch(e){}
+try{const c=JSON.parse(localStorage.getItem("jt-cookie"));if(c==="accept"||(c==null&&window.jfAsk===0))pixelLoad()}catch(e){if(window.jfAsk===0)pixelLoad()}
 </script>
 <!-- End Meta Pixel Code -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -444,7 +445,7 @@ dl.specs dt{font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-tran
       <div><h4>Shop</h4><ul><li><a href="#/shop">All prints</a></li><li><a href="#/collections">Collections</a></li></ul></div>
       <div><h4>Studio</h4><ul><li><a href="#/about">About</a></li><li><a href="#/contact">Contact</a></li></ul></div>
     </div>
-    <div class="legal"><span>© 2026 Just Framed</span><span>All photographs © Just Framed. Reproduction without permission is not permitted.</span></div>
+    <div class="legal"><span>© 2026 Just Framed</span><span>This site uses cookies for statistics and ads. <a href="#/privacy">Privacy and cookies</a></span><span>All photographs © Just Framed. Reproduction without permission is not permitted.</span></div>
   </div>
 </footer>
 
@@ -1087,6 +1088,26 @@ function product(slug){
   </div>`;
 }
 
+/* What the site collects and the visitor's choice. Keep in step with "Visit statistics" and
+   "Ads pixel" below, and with the newsletter (worker.js). */
+const privacyState=()=>({decline:"Statistics and ad cookies are <strong>off</strong> on this browser.",accept:"Statistics and ad cookies are <strong>on</strong> on this browser."})[statConsent()]||"You haven't chosen yet on this browser.";
+function privacy(){
+  return `<div class="wrap"><div class="phead"><h1>Privacy and cookies</h1></div>
+  <div class="prose" style="max-width:680px;padding-bottom:60px">
+    <p>This page explains what the site collects, why, and how to turn it off.</p>
+    <h2>Statistics</h2>
+    <p>To see which prints people look at and to improve the site, it records the pages you view and for how long, the buttons you tap, the sizes and finishes you pick, the site or link you came from, your approximate country and city, your type of device and browser, and its language. Your browser keeps a random number so that visits from the same browser are counted together. Your IP address isn't stored.</p>
+    <h2>Ads (Meta Pixel)</h2>
+    <p>The site uses the Meta Pixel. It tells Meta (Facebook and Instagram) which pages you viewed, what you added to the cart and when you sent an order, so we can measure our ads and show them to people likely to be interested. Meta sets its own cookie for this and handles the data under its <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener">privacy policy</a>.</p>
+    <h2>Visit counts</h2>
+    <p>Cloudflare, which hosts the site, also counts visits, without cookies and without identifying you.</p>
+    <h2>Newsletter</h2>
+    <p>If you sign up, your email address or phone number is kept to send you your promo code and news, and visits on the browser you signed up on are linked to it. To be removed, write to <a href="mailto:justframed-lb@outlook.com">justframed-lb@outlook.com</a>.</p>
+    <h2>Your choice</h2>
+    <p id="privacyState">${privacyState()}</p>
+    <p><button type="button" class="btn" data-consent="decline">Turn them off</button> <button type="button" class="btn ghost" data-consent="accept">Turn them on</button></p>
+  </div></div>`;
+}
 function about(){
   return `<div class="wrap"><div class="phead"><h1>About the photography</h1></div>
   <div class="about" style="padding-bottom:60px">
@@ -1176,6 +1197,7 @@ function route(){
   else if(page==="print"){html=product(arg);const p=PRINTS.find(x=>x.slug===arg);if(p)title=`${p.title} — Just Framed`}
   else if(page==="about"){html=about();title="About — Just Framed"}
   else if(page==="contact"){html=contact();title="Contact — Just Framed"}
+  else if(page==="privacy"){html=privacy();title="Privacy and cookies — Just Framed"}
   else if(page==="cart"){html=cartPage();title="Cart — Just Framed"}
   else if(page==="poster-box"){html=posterTool();title="Poster box — Just Framed"}
   else html=notFound();
@@ -1218,6 +1240,9 @@ function bind(page,arg){
     bindSortMenu();
   }
   if(page==="poster-box") bindPosterTool();
+  if(page==="privacy") document.querySelectorAll("[data-consent]").forEach(b=>b.onclick=()=>{
+    store("jt-cookie",b.dataset.consent);$("#cookie").hidden=true;statFlush();pixelConsent();
+    $("#privacyState").innerHTML=privacyState();toast(b.dataset.consent==="accept"?"Turned on":"Turned off")});
   if(page==="shop"){
     document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{location.hash="#/shop"+(b.dataset.f?"/"+b.dataset.f:"")});
     bindSortMenu(()=>shopPrints(arg));
@@ -1474,7 +1499,8 @@ document.querySelectorAll("[data-wa]").forEach(a=>{a.href=waLink();a.target="_bl
 document.querySelectorAll("[data-ig]").forEach(a=>{a.href=igLink();a.target="_blank";a.rel="noopener"});
 $("#logo").innerHTML=logoHTML(); $("#logo2").innerHTML=logoHTML();
 $(".menu-btn").onclick=e=>{const o=$("#nav").classList.toggle("open");e.currentTarget.setAttribute("aria-expanded",o)};
-if(!store("jt-cookie")) $("#cookie").hidden=false;
+// Only visitors who are asked (Europe and the UK, see worker.js consentScript) see the banner
+if(!store("jt-cookie")&&window.jfAsk!==0) $("#cookie").hidden=false;
 document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-cookie",b.dataset.c);$("#cookie").hidden=true;statFlush();pixelConsent()});
 /* Personal links: /?s=<tag> in messages to a subscriber (personalLink in worker.js). This browser is
    theirs from now on (see "Visit statistics"), and the pop-up stays closed. The tag comes off the
@@ -1495,13 +1521,15 @@ newsletter();
 /* ---------- Visit statistics ----------
    Records which pages are viewed and for how long, what is clicked and which sizes and finishes
    are picked. worker.js (/t) saves it; analytics/report.mjs turns it into a report.
-   Only for visitors who click Accept on the cookie banner: until they choose, events wait here
-   and are sent if they accept, dropped if they decline. No IP addresses are kept. Visits are
+   Only with consent (statConsent): in Europe and the UK the visitor is asked with the cookie banner,
+   and until they choose, events wait here and are sent if they accept, dropped if they decline.
+   Elsewhere they aren't asked, and can turn it off on the Privacy page (#/privacy). No IP addresses are kept. Visits are
    anonymous, except on the browser of a newsletter subscriber: it keeps their private tag (jt-sub,
    from signing up, their own promo code or their personal link) and sends it along, so the report
    shows the visits as theirs, the ones from before the tag too. */
 const STAT={q:[], view:null, timer:null, ref:null, on:/^https?:$/.test(location.protocol)};
-const statConsent=()=>store("jt-cookie");
+// The visitor's own choice (banner or Privacy page), else "accept" where they aren't asked
+const statConsent=()=>store("jt-cookie")||(window.jfAsk===0?"accept":null);
 const statId=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
 function stat(t,o={}){
   if(!STAT.on||statConsent()==="decline") return;
@@ -1592,8 +1620,8 @@ const PIXEL_CONTACT=["WhatsApp","Instagram","Facebook","Email"];
 function pixel(ev,o){if(!STAT.on||statConsent()==="decline"||!window.fbq) return; o?fbq("track",ev,o):fbq("track",ev)}
 function pixelConsent(){
   if(!window.fbq) return;
-  if(statConsent()==="accept") pixelLoad();
-  else fbq.queue=fbq.queue.filter(a=>a[0]!=="track");
+  if(statConsent()==="accept"){fbq("consent","grant");pixelLoad()}
+  else{fbq.queue=fbq.queue.filter(a=>a[0]!=="track");fbq("consent","revoke")}
 }
 // A print as Meta's ads see it; value is left out when the price isn't known (custom size)
 const pixelItem=(p,value,qty=1)=>({content_ids:[p.slug],content_name:p.title,content_type:"product",contents:[{id:p.slug,quantity:qty}],

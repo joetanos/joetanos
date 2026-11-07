@@ -226,7 +226,7 @@ ${barCard("Languages", count(S.map(s => s.lang)), "Browser language, by visit.")
 <div class="scroll">${table(["When", "Print", "Choice", "From", "Device"], orders.slice().reverse().slice(0, 100).map(o =>
   [longDate(o.ts, true), title(o.item), o.detail || "", [o.city, countryName(o.country)].filter(Boolean).join(", "), [o.device, o.browser].filter(Boolean).join(", ")]), false, true)}</div></div>
 
-<p class="note">Counts only visitors who clicked Accept on the site's cookie banner, so the real number of visitors is higher. Search engines and link-preview robots are left out.</p>
+<p class="note">Visitors in Europe and the UK are counted only if they accept the cookie banner, and anyone can turn counting off on the Privacy page. Until 7 November 2026 only visitors who accepted the banner were counted, so numbers before then are lower. Search engines and link-preview robots are left out.</p>
 </main><div id="tip"></div>
 <script>const tip=document.getElementById("tip");document.addEventListener("pointermove",e=>{const t=e.target.closest("[data-tip]");if(!t){tip.style.display="none";return}tip.textContent=t.dataset.tip;tip.style.display="block";const x=Math.min(e.clientX+12,innerWidth-tip.offsetWidth-8);tip.style.left=x+"px";tip.style.top=(e.clientY+14)+"px"})</script>
 </body></html>`;

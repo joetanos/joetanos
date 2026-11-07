@@ -50,7 +50,7 @@ export default {
         // Run before anything else loads: relative links resolve from the site root,
         // and the address bar shows the normal print page.
         // jfShared tells the visit statistics that this visit came from a shared link.
-        el.prepend(`<base href="/"><script>history.replaceState(null,"","/#/print/${encodeURIComponent(slug)}");window.jfShared=1</script>`, { html: true });
+        el.prepend(`<base href="/"><script>history.replaceState(null,"","/#/print/${encodeURIComponent(slug)}");window.jfShared=1</script>${consentScript(request)}`, { html: true });
         if (sheet) el.append(catalogScript(sheet), { html: true });
       }})
       .on("title", { element(el) { el.setInnerContent(title) } })
@@ -65,7 +65,7 @@ export default {
       .on('meta[property="og:image:width"], meta[property="og:image:height"]', { element(el) { el.remove() } })
       .transform(page);
     const out = new Response(res.body, res);
-    out.headers.set("Cache-Control", "public, max-age=300");
+    out.headers.set("Cache-Control", "private, max-age=300"); // differs by country (consentScript)
     out.headers.delete("ETag");
     return out;
   }
@@ -73,20 +73,35 @@ export default {
 
 /* Home page with the print list already inside it (window.jfCatalog), so a first-time visitor,
    such as someone tapping an ad, sees the photos without waiting for the Google Sheet.
-   The page still fetches the sheet afterwards and redraws if a print was added or changed. */
+   The page still fetches the sheet afterwards and redraws if a print was added or changed.
+   It also says whether to ask this visitor about cookies (consentScript). */
 async function homePage(request, url, env, ctx) {
   if (request.method !== "GET") return env.ASSETS.fetch(request);
   // No If-None-Match: the page changes with the sheet, so the files' own ETag doesn't apply
   // Never waits for Google: with no copy in the cache yet, the page loads the sheet itself as before
   const [page, sheet] = await Promise.all([env.ASSETS.fetch(new Request(url)), sheetText(ctx, true)]);
-  if (!sheet || page.status !== 200) return page;
-  const res = new HTMLRewriter().on("head", { element(el) { el.append(catalogScript(sheet), { html: true }) } }).transform(page);
+  if (page.status !== 200) return page;
+  const res = new HTMLRewriter().on("head", { element(el) {
+    el.prepend(consentScript(request), { html: true }); // before the Meta Pixel code in <head>
+    if (sheet) el.append(catalogScript(sheet), { html: true });
+  }}).transform(page);
   const out = new Response(res.body, res);
-  out.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  out.headers.set("Cache-Control", "private, max-age=0, must-revalidate"); // differs by country
   out.headers.delete("ETag");
   return out;
 }
 const catalogScript = text => `<script>window.jfCatalog=${JSON.stringify(text).replace(/</g, "\\u003c")}</script>`;
+
+/* Whether the page asks this visitor about cookies before the statistics and the Meta Pixel run:
+   yes in Europe and the UK (GDPR), and when the country isn't known; elsewhere they run, and the
+   footer and the Privacy page (#/privacy in index.html) say so and let the visitor turn them off.
+   window.jfAsk=0 means don't ask; a page without it (opened some other way) asks. */
+const ASK_COUNTRIES = new Set(["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT",
+  "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB", "CH", "GI", "GG", "JE", "IM"]);
+function consentScript(request) {
+  const c = (request.cf && request.cf.country) || "";
+  return `<script>window.jfAsk=${!/^[A-Z]{2}$/.test(c) || c === "XX" || ASK_COUNTRIES.has(c) ? 1 : 0}</script>`;
+}
 
 // Hosts /img may resize photos from (besides this site). Keep in sync with IMG_HOSTS in index.html
 const IMG_HOSTS = ["photos.justframed-lb.com", "pub-072a6b055ac5436297717deddd7c9512.r2.dev"];
@@ -472,7 +487,7 @@ ${h2("Where visitors came from")}${bars(visitsBy(cameFrom))}
 ${h2("Countries")}${bars(visitsBy(e => country(e.country)))}
 ${h2("Devices")}${bars(visitsBy(e => e.device))}
 ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choose").map(e => e.detail)))}
-<p style="color:${muted};font-size:12px;margin-top:28px">Counts only visitors who accepted the cookie banner. Your own browsers (the ones you opened ${SITE}/?me=1 on) are left out${ownVisits ? `: ${ownVisits} visit${ownVisits === 1 ? "" : "s"} of yours in this period` : ""}. A subscriber's visits show once their browser is linked to them: by signing up on it, entering their code or opening their personal link. The attached Excel file has a Statistics sheet (audience, pages, every print and collection opened or not, clicks, with charts) and an Events sheet with every event. For a full report with charts and navigation paths, run <code>node analytics/report.mjs</code>.</p>
+<p style="color:${muted};font-size:12px;margin-top:28px">Visitors in Europe and the UK are counted only if they accept the cookie banner, and anyone can turn counting off on the Privacy page. Your own browsers (the ones you opened ${SITE}/?me=1 on) are left out${ownVisits ? `: ${ownVisits} visit${ownVisits === 1 ? "" : "s"} of yours in this period` : ""}. A subscriber's visits show once their browser is linked to them: by signing up on it, entering their code or opening their personal link. The attached Excel file has a Statistics sheet (audience, pages, every print and collection opened or not, clicks, with charts) and an Events sheet with every event. For a full report with charts and navigation paths, run <code>node analytics/report.mjs</code>.</p>
 </div></body></html>`;
 
   const text = `Just Framed daily report, ${dateText} (${period}, until ${timeOf(end)})\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`
@@ -525,7 +540,7 @@ function statisticsSheet({ day, before, back, shop, name, country, signups, head
   const put = cells => { rows[y++] = cells };
   put([C("Just Framed: statistics", "title")]);
   put([C(heading, "muted")]);
-  put([C("Counts only visitors who accepted the cookie banner. Every single event is in the Events sheet.", "muted")]);
+  put([C("Visitors in Europe and the UK are counted only if they accept the cookie banner, and anyone can turn counting off on the Privacy page. Every single event is in the Events sheet.", "muted")]);
   y++;
 
   /* A titled table; with chart, a bar chart of one column beside it (only the rows above zero,

@@ -105,8 +105,10 @@ backup: the site uses them if the sheet can't be reached.
 
 When the site runs on Cloudflare, it records which pages people view and for
 how long, what they click (WhatsApp, share, photos…), which sizes and finishes
-they pick, and where they came from. This only applies to visitors who click
-**Accept** on the cookie banner. It's saved in the Cloudflare D1 database
+they pick, and where they came from. Visitors in Europe and the UK are asked
+first with the cookie banner and only counted if they click **Accept**; everyone
+else is counted unless they turn it off on the site's Privacy page (#/privacy,
+linked in the footer). worker.js decides by country (consentScript). It's saved in the Cloudflare D1 database
 `justframed-analytics`. No IP addresses are kept.
 
 Visits are anonymous, except for newsletter subscribers. Each subscriber has a
@@ -141,8 +143,8 @@ It writes an HTML report, a PDF copy and a CSV file for Excel into
 
 The Meta Pixel (ID `2413175742823876`, in the `<head>` of `index.html`) tells
 Meta's Events Manager what visitors do, for ads and their results. Like the
-statistics, it only runs for visitors who click **Accept** on the cookie
-banner. It sends:
+statistics, it runs with the same consent rule (asked first in Europe and the
+UK, otherwise on unless turned off on the Privacy page). It sends:
 
 - **PageView**: every page.
 - **ViewContent**: a print page, with the print, its id (`slug`) and its price
