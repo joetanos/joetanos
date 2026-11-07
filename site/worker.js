@@ -30,13 +30,14 @@ export default {
     if (url.pathname === "/report-now") return reportNow(request, env);
     if (url.pathname === "/subscribe") return subscribe(request, url, env, ctx);
     if (url.pathname === "/promo") return promo(url, env);
-    if (url.pathname === "/catalog.csv") return catalogFeed(url, env);
+    if (url.pathname === "/catalog.csv") return catalogFeed(url, env, ctx);
+    if (url.pathname === "/") return homePage(request, url, env, ctx);
     const m = url.pathname.match(/^\/p\/([^/]+)\/?$/);
     if (!m) return env.ASSETS.fetch(request);
 
     const slug = decodeURIComponent(m[1]);
-    const print = await findPrint(slug, url, env);
-    const page = await env.ASSETS.fetch(new Request(new URL("/", url), request));
+    const [print, sheet] = await Promise.all([findPrint(slug, url, env, ctx), sheetText(ctx)]);
+    const page = await env.ASSETS.fetch(new Request(new URL("/", url)));
     if (!print) return Response.redirect(new URL("/#/shop", url), 302);
 
     const title = print.title + " – Just Framed";
@@ -50,6 +51,7 @@ export default {
         // and the address bar shows the normal print page.
         // jfShared tells the visit statistics that this visit came from a shared link.
         el.prepend(`<base href="/"><script>history.replaceState(null,"","/#/print/${encodeURIComponent(slug)}");window.jfShared=1</script>`, { html: true });
+        if (sheet) el.append(catalogScript(sheet), { html: true });
       }})
       .on("title", { element(el) { el.setInnerContent(title) } })
       .on('meta[property="og:url"]', set(url.href))
@@ -64,9 +66,27 @@ export default {
       .transform(page);
     const out = new Response(res.body, res);
     out.headers.set("Cache-Control", "public, max-age=300");
+    out.headers.delete("ETag");
     return out;
   }
 };
+
+/* Home page with the print list already inside it (window.jfCatalog), so a first-time visitor,
+   such as someone tapping an ad, sees the photos without waiting for the Google Sheet.
+   The page still fetches the sheet afterwards and redraws if a print was added or changed. */
+async function homePage(request, url, env, ctx) {
+  if (request.method !== "GET") return env.ASSETS.fetch(request);
+  // No If-None-Match: the page changes with the sheet, so the files' own ETag doesn't apply
+  // Never waits for Google: with no copy in the cache yet, the page loads the sheet itself as before
+  const [page, sheet] = await Promise.all([env.ASSETS.fetch(new Request(url)), sheetText(ctx, true)]);
+  if (!sheet || page.status !== 200) return page;
+  const res = new HTMLRewriter().on("head", { element(el) { el.append(catalogScript(sheet), { html: true }) } }).transform(page);
+  const out = new Response(res.body, res);
+  out.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+  out.headers.delete("ETag");
+  return out;
+}
+const catalogScript = text => `<script>window.jfCatalog=${JSON.stringify(text).replace(/</g, "\\u003c")}</script>`;
 
 // Hosts /img may resize photos from (besides this site). Keep in sync with IMG_HOSTS in index.html
 const IMG_HOSTS = ["photos.justframed-lb.com", "pub-072a6b055ac5436297717deddd7c9512.r2.dev"];
@@ -671,8 +691,8 @@ const FEED_FINISHES = { print: "Canvas Print Only", oak: "Gallery Wrapped Canvas
 const FEED_PRICES = [{ print: 20, oak: 35 }, { print: 30, oak: 55 }, { print: 45, oak: 85 }];
 const FEED_DEFAULT = { size: 1, finish: "oak" };
 
-async function catalogFeed(url, env) {
-  const prints = await catalog(env, url);
+async function catalogFeed(url, env, ctx) {
+  const prints = await catalog(env, url, ctx);
   const abs = u => new URL(u, SITE).href;
   const price = (i, f) => (FEED_PRICES[i] || FEED_PRICES[FEED_PRICES.length - 1])[f];
   const rows = prints.map(p => {
@@ -698,21 +718,17 @@ async function catalogFeed(url, env) {
   return new Response(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Cache-Control": "public, max-age=900" } });
 }
 
-async function findPrint(slug, url, env) {
-  const row = (await catalog(env, url)).find(r => r.slug === slug);
+async function findPrint(slug, url, env, ctx) {
+  const row = (await catalog(env, url, ctx)).find(r => r.slug === slug);
   if (!row) return null;
   const images = (row.images || row.image || row.photos || "").split(/\||\n|\s+(?=https?:)/).map(x => x.trim()).filter(Boolean);
   return { title: row.title, place: row.place || row.location, year: row.year, description: row.description || row.desc, image: images[0] };
 }
 
 // The visible prints from the sheet (or the backup prints.csv), each with its slug
-async function catalog(env, url) {
-  let text = "";
-  try {
-    const r = await fetch(CATALOG_URL, { cf: { cacheTtl: 300, cacheEverything: true } });
-    if (r.ok) text = await r.text();
-  } catch (e) {}
-  if (!/slug|title/i.test(text.slice(0, 500))) {
+async function catalog(env, url, ctx) {
+  let text = await sheetText(ctx);
+  if (!text) {
     text = await (await env.ASSETS.fetch(new URL("/prints.csv", url))).text();
   }
   const t = parseCSV(text);
@@ -729,6 +745,29 @@ async function catalog(env, url) {
     out.push({ ...row, slug: s });
   }
   return out;
+}
+
+/* The sheet as text, or "" when it can't be read. Google takes a second or more to answer, so a copy
+   is kept in Cloudflare's cache; once it is 5 minutes old the next request gets it at once and a fresh
+   copy is fetched in the background (without ctx, e.g. a test, it waits for the fresh copy).
+   noWait: with no copy in the cache yet, return "" at once and fetch one in the background. */
+const SHEET_MAX_AGE = 300000;
+async function sheetText(ctx, noWait) {
+  const cache = caches.default, key = new Request(SITE + "/__sheet.csv");
+  const refresh = async () => {
+    try {
+      const r = await fetch(CATALOG_URL);
+      const text = r.ok ? await r.text() : "";
+      if (!/slug|title/i.test(text.slice(0, 500))) return "";
+      await cache.put(key, new Response(text, { headers: { "Cache-Control": "public, max-age=604800", "X-Fetched": String(Date.now()) } }));
+      return text;
+    } catch (e) { return "" }
+  };
+  const hit = await cache.match(key).catch(() => null);
+  if (!hit) { if (noWait && ctx) { ctx.waitUntil(refresh()); return "" } return refresh() }
+  if (Date.now() - Number(hit.headers.get("X-Fetched")) < SHEET_MAX_AGE) return hit.text();
+  if (ctx) { ctx.waitUntil(refresh()); return hit.text() }
+  return (await refresh()) || hit.text();
 }
 
 function parseCSV(s) {

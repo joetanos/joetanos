@@ -4,7 +4,9 @@
   "main": "./worker.js",
   "assets": {
     "directory": ".",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    // The home page goes through worker.js, which puts the print list in it (homePage)
+    "run_worker_first": ["/"]
   },
   // Resizes photos for /img in worker.js
   "images": {

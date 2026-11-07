@@ -710,17 +710,18 @@ function useCatalog(text){
   }catch(e){console.warn("Catalog could not be read, using the built-in prints instead.",e)}
   return false;
 }
-/* The sheet takes a second or two to answer, so the page first shows the copy saved on the
-   last visit, then fetches the sheet and redraws only if something changed. */
+/* The sheet takes a second or two to answer, so the page first shows the copy worker.js put in
+   the page (window.jfCatalog, at most a few minutes old) or else the one saved on the last visit,
+   then fetches the sheet and redraws only if something changed. */
 async function loadCatalog(){
   if(!CATALOG_URL) return;
-  const saved=store("jt-catalog");
+  const saved=window.jfCatalog||store("jt-catalog");
   let shown=false;
   const fresh=(async()=>{
     try{
       const url=CATALOG_URL+(CATALOG_URL.includes("?")?"&":"?")+"t="+Date.now();
       const text=await (await fetch(url,{cache:"no-store"})).text();
-      if(text===saved){pruneCart();return}
+      if(text===saved){store("jt-catalog",text);pruneCart();return}
       // Redraw in place, keeping the visitor where they were on the page
       if(useCatalog(text)){store("jt-catalog",text);pruneCart();if(shown){const y=scrollY;route();scrollTo(0,y)}}
     }catch(e){console.warn("Catalog could not be loaded, using the built-in prints instead.",e)}
