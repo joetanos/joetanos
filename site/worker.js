@@ -126,7 +126,8 @@ async function resized(request, url, env, ctx) {
   return out;
 }
 
-/* Visit statistics: the page sends {v: visitor id, s: visit id, r: referrer, u: subscriber tag, e: [events]}
+/* Visit statistics: the page sends {v: visitor id, s: visit id, r: referrer, u: subscriber tag, o: 1 on the
+   studio's own browsers (opened /?me=1), e: [events]}
    (see "Visit statistics" in index.html). Country, city, device and browser are added here;
    the IP address is not stored. A subscriber's tag links the visitor id to them (subscriber_visitors). */
 const EVENT_TYPES = ["view", "leave", "click", "choose"];
@@ -160,6 +161,9 @@ async function track(request, url, env, ctx) {
   const vid = s(body.v, 40);
   if (vid && TAG.test(body.u)) ctx.waitUntil(env.DB.prepare("INSERT OR IGNORE INTO subscriber_visitors (tag, vid, ts) SELECT tag, ?, ? FROM subscribers WHERE tag = ?")
     .bind(vid, now, body.u).run().catch(err => console.error("Subscriber visitor not linked", err)));
+  // The studio's own browser: the reports leave its visits out, the earlier ones too (ownVisitors)
+  if (vid && body.o === 1) ctx.waitUntil(env.DB.prepare("INSERT OR IGNORE INTO owner_visitors (vid, ts) VALUES (?, ?)")
+    .bind(vid, now).run().catch(err => console.error("Own browser not marked", err)));
   return done;
 }
 
@@ -364,6 +368,12 @@ function beirutHour(ts) {
 // Sends the daily report right away, for testing. Works only while the REPORT_KEY secret is set
 // (npx wrangler secret put REPORT_KEY) and the request carries it as "Authorization: Bearer <key>".
 // ?days=7 covers the last 7 days instead of 24 hours.
+// The studio's own browsers (opened /?me=1 on, see track and index.html), left out of the reports
+async function ownVisitors(env) {
+  const { results } = await env.DB.prepare("SELECT vid FROM owner_visitors").all().catch(() => ({ results: [] }));
+  return new Set(results.map(r => r.vid));
+}
+
 async function reportNow(request, env) {
   if (!env.REPORT_KEY || request.method !== "POST" || request.headers.get("Authorization") !== `Bearer ${env.REPORT_KEY}`)
     return new Response("Not found", { status: 404 });
@@ -374,10 +384,14 @@ async function reportNow(request, env) {
 
 async function dailyReport(env, now, test, days = 1) {
   const end = test ? now : now - (now % 3600000), start = end - days * DAY;
-  const { results: ev } = await env.DB.prepare("SELECT * FROM events WHERE ts >= ? AND ts < ? ORDER BY ts").bind(start - 7 * days * DAY, end).all();
+  // Without the studio's own browsers (opened /?me=1)
+  const own = await ownVisitors(env);
+  const { results: all } = await env.DB.prepare("SELECT * FROM events WHERE ts >= ? AND ts < ? ORDER BY ts").bind(start - 7 * days * DAY, end).all();
+  const ev = all.filter(e => !own.has(e.vid));
+  const ownVisits = new Set(all.filter(e => e.ts >= start && own.has(e.vid) && e.type === "view").map(e => e.sid)).size;
   // Visitors of the period who had come before it (at any time)
-  const { results: back } = await env.DB.prepare("SELECT DISTINCT vid FROM events WHERE ts < ? AND vid IN (SELECT vid FROM events WHERE ts >= ? AND ts < ?)")
-    .bind(start, start, end).all();
+  const back = (await env.DB.prepare("SELECT DISTINCT vid FROM events WHERE ts < ? AND vid IN (SELECT vid FROM events WHERE ts >= ? AND ts < ?)")
+    .bind(start, start, end).all()).results.filter(r => !own.has(r.vid));
   let shop = [];
   try { shop = await catalog(env, SITE) } catch (e) {}
   const titles = {};
@@ -458,7 +472,7 @@ ${h2("Where visitors came from")}${bars(visitsBy(cameFrom))}
 ${h2("Countries")}${bars(visitsBy(e => country(e.country)))}
 ${h2("Devices")}${bars(visitsBy(e => e.device))}
 ${h2("Sizes and finishes picked")}${bars(count(day.filter(e => e.type === "choose").map(e => e.detail)))}
-<p style="color:${muted};font-size:12px;margin-top:28px">Counts only visitors who accepted the cookie banner. A subscriber's visits show once their browser is linked to them: by signing up on it, entering their code or opening their personal link. The attached Excel file has a Statistics sheet (audience, pages, every print and collection opened or not, clicks, with charts) and an Events sheet with every event. For a full report with charts and navigation paths, run <code>node analytics/report.mjs</code>.</p>
+<p style="color:${muted};font-size:12px;margin-top:28px">Counts only visitors who accepted the cookie banner. Your own browsers (the ones you opened ${SITE}/?me=1 on) are left out${ownVisits ? `: ${ownVisits} visit${ownVisits === 1 ? "" : "s"} of yours in this period` : ""}. A subscriber's visits show once their browser is linked to them: by signing up on it, entering their code or opening their personal link. The attached Excel file has a Statistics sheet (audience, pages, every print and collection opened or not, clicks, with charts) and an Events sheet with every event. For a full report with charts and navigation paths, run <code>node analytics/report.mjs</code>.</p>
 </div></body></html>`;
 
   const text = `Just Framed daily report, ${dateText} (${period}, until ${timeOf(end)})\n\nVisitors: ${today.visitors}\nVisits: ${today.visits}\nPage views: ${today.views}\nWhatsApp orders: ${today.orders}\nShares: ${today.shares}\n\n`

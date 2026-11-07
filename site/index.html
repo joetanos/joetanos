@@ -1482,6 +1482,15 @@ document.querySelectorAll("#cookie button").forEach(b=>b.onclick=()=>{store("jt-
 {const q=new URLSearchParams(location.search), t=q.get("s");
   if(t!==null){if(/^[0-9a-f]{10}$/.test(t)){store("jt-sub",t);store("jt-nl",{done:1})}
     q.delete("s");history.replaceState(null,"",location.pathname+(q.toString()?"?"+q:"")+location.hash)}}
+/* The studio's own browsers: opening /?me=1 marks this browser (jt-me), so the reports leave its
+   visits out, the earlier ones too (worker.js, owner_visitors). /?me=0 unmarks it, and its next
+   visits count as a new visitor. Like the tag, it comes off the address. */
+{const q=new URLSearchParams(location.search), m=q.get("me");
+  if(m!==null){
+    if(m==="0"){store("jt-me",null);store("jt-vid",null)}else store("jt-me",1);
+    q.delete("me");history.replaceState(null,"",location.pathname+(q.toString()?"?"+q:"")+location.hash);
+    setTimeout(()=>toast(m==="0"?"This browser's visits count in the reports again":"Marked as yours: the reports leave this browser out"),600);
+  }}
 newsletter();
 /* ---------- Visit statistics ----------
    Records which pages are viewed and for how long, what is clicked and which sizes and finishes
@@ -1504,9 +1513,9 @@ function statFlush(){
   if(statConsent()!=="accept"||!STAT.q.length) return;
   let v=store("jt-vid"); if(!v){v=statId();store("jt-vid",v)}
   let sid; try{sid=sessionStorage.getItem("jt-sid")||statId();sessionStorage.setItem("jt-sid",sid)}catch(e){sid=STAT.sid=STAT.sid||statId()}
-  const u=store("jt-sub")||undefined;
+  const u=store("jt-sub")||undefined, o=store("jt-me")?1:undefined;
   while(STAT.q.length){
-    const body=JSON.stringify({v,s:sid,r:STAT.ref,u,e:STAT.q.splice(0,30)});
+    const body=JSON.stringify({v,s:sid,r:STAT.ref,u,o,e:STAT.q.splice(0,30)});
     try{if(!navigator.sendBeacon("/t",new Blob([body],{type:"text/plain"})))fetch("/t",{method:"POST",body,keepalive:true})}catch(e){}
   }
 }

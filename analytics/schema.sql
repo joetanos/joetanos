@@ -43,6 +43,13 @@ CREATE TABLE IF NOT EXISTS subscriber_visitors (
 );
 CREATE INDEX IF NOT EXISTS subscriber_visitors_vid ON subscriber_visitors (vid);
 
+-- The studio's own browsers: opening /?me=1 marks one (index.html, worker.js /t). The reports leave
+-- out every visit of these visitor ids, from before and after. Safe to run on an existing database.
+CREATE TABLE IF NOT EXISTS owner_visitors (
+  vid TEXT PRIMARY KEY, -- events.vid
+  ts INTEGER NOT NULL   -- when it was marked, ms since 1970 (UTC)
+);
+
 -- The studio's own promo codes (worker.js /promo). Usable any number of times while active = 1.
 -- Add one:     INSERT INTO promo_codes (code, percent, min, note, created) VALUES ('NAME20-XXXX', 20, 0, 'what it is for', strftime('%s','now') * 1000);
 -- Turn it off: UPDATE promo_codes SET active = 0 WHERE code = 'NAME20-XXXX';

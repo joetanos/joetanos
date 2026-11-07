@@ -121,6 +121,12 @@ Put a subscriber's personal link (Subscribers sheet, last column) in the
 messages you send them. Then their visits show from any phone or computer
 they open it on, and "Came from" says Newsletter.
 
+To keep your own visits out of the reports, open
+`https://justframed-lb.com/?me=1` once on each of your phones and computers,
+and in each app you browse the site from (the Instagram and Facebook apps
+have their own browser: send yourself the link there and open it). Its
+earlier visits are left out too. `?me=0` undoes it on that browser.
+
 To get a report, run this in the project folder (one level above this one).
 You need Node.js and a one-time `npx wrangler login`:
 ```

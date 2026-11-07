@@ -38,6 +38,14 @@ for (let last = 0; ;) {
   last = page[page.length - 1].id;
 }
 events.sort((a, b) => a.ts - b.ts);
+// The studio's own browsers (opened /?me=1, see worker.js) are left out
+try {
+  const own = new Set(d1("SELECT vid FROM owner_visitors").map(r => r.vid)), n = events.length;
+  let k = 0;
+  for (const e of events) if (!own.has(e.vid)) events[k++] = e;
+  events.length = k;
+  if (n > events.length) console.log(`${n - events.length} events from your own browsers left out.`);
+} catch (e) { console.warn("Couldn't read your own browsers; their visits are counted.") }
 console.log(`${events.length} events.`);
 
 // Newsletter subscribers' browsers (linked by worker.js /t): visitor id → email or phone
